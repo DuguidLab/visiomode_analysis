@@ -45,3 +45,13 @@ def d_prime(df, session_type):
 
     # Return d' 
     return d_prime
+
+# Calculate mean RT for all trial types
+mean_rt_hits = df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)]["response_time"].mean()
+
+mean_rt_false_alarms = df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)]["response_time"].mean()
+
+# Calculate median RT for all trial types
+median_rt_hits = df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)]["response_time"].median()
+
+median_rt_false_alarms = df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)]["response_time"].median()
