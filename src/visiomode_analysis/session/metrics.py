@@ -38,7 +38,10 @@ def d_prime(df, session_type):
 
     # Calculate d'
     # TODO: Switch d' calculation if task is 2afc
-    d_prime = norm.ppf(hit_rate) - norm.ppf(fa_rate)
+    if session_type == "gonogo":
+        d_prime = norm.ppf(hit_rate) - norm.ppf(fa_rate)
+    else:
+        d_prime = (1/sqrt(2))*(norm.ppf(hit_rate) - norm.ppf(fa_rate))
 
     # Return d' 
     return d_prime
