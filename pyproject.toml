@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "visiomode-analysis"
+dynamic = ["version"]
+description = 'Analysis package for Visiomode sessions'
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Sophie Holland", email = "S.G.Holland@sms.ed.ac.uk" },
+  { name = "Constantinos Eleftheriou", email = "Constantinos.Eleftheriou@ed.ac.uk" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "pandas",
+  "numpy",
+  "scipy"
+]
+
+[project.urls]
+Documentation = "https://github.com/DuguidLab/visiomode_analysis#readme"
+Issues = "https://github.com/DuguidLab/visiomode_analysis/issues"
+Source = "https://github.com/DuguidLab/visiomode_analysis"
+
+[tool.hatch.envs.default]
+python = "3.9"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/visiomode_analysis"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/.github", "/docs"]
+
+[tool.hatch.version]
+path = "src/visiomode_analysis/__about__.py"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/visiomode_analysis tests}"
+
+[tool.coverage.run]
+source_pkgs = ["visiomode_analysis", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/visiomode_analysis/__about__.py",
+]
+
+[tool.coverage.paths]
+visiomode_analysis = ["src/visiomode_analysis", "*/visiomode-analysis/src/visiomode_analysis"]
+tests = ["tests", "*/visiomode-analysis/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
