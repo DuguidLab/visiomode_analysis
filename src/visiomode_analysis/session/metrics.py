@@ -92,4 +92,4 @@ def rt_metric(df, trial_type, metric_type):
             rt_metric = median_rt_both
 
     # return desired metric
-    return rt_metric
+    print(rt_metric)
