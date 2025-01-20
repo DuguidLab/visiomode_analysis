@@ -46,50 +46,34 @@ def d_prime(df, session_type):
     # Return d' 
     return d_prime
 
-
 def rt_metric(df, trial_type, metric_type):
     '''Defines a function to calculate mean or median RT for different trial types
     
     Args:
         df: Pandas dataframe with session data.
-        trial_type: hit or false_alarm
-        metric type: mean_rt or median_rt
+        trial_type: hits or false_alarms or both (default is both)
+        metric type: mean or median (default is median)
     
     Output: 
         float representing the mean/median RT for a all hit/FA trials in a session
     
     Example: 
-        hit_mean_RT = rt_metric(df, "hit", "mean"_rt)'''
+        hit_mean_RT = rt_metric(df, trial_type='hit', metric_type='mean')'''
     
-    #calculate mean RT for each trial type
-    mean_rt_hits = df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)]["response_time"].mean()
 
-    mean_rt_fas = df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)]["response_time"].mean()
-
-    mean_rt_both = df[(df.response.notnull()) & (df.correction == False)]["response_time"].mean()
-
-    # calculate median RT for each trial type
-    median_rt_hits = df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)]["response_time"].median()
-
-    median_rt_fas = df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)]["response_time"].median()
-
-    median_rt_both = df[(df.response.notnull()) & (df.correction == False)]["response_time"].median()
-  
     if trial_type == "hits":
         if metric_type == "mean":
-            rt_metric = mean_rt_hits
+            return df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)]["response_time"].mean()
         else:
-            rt_metric = median_rt_hits
+            return df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)]["response_time"].median()
     elif trial_type == "false_alarms":
         if metric_type == "mean":
-            rt_metric = mean_rt_fas
+            return df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)]["response_time"].mean()
         else:
-            rt_metric = median_rt_fas
+            return df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)]["response_time"].median()
     else:
         if metric_type == "mean":
-            rt_metric = mean_rt_both
+            return df[(df.response.notnull()) & (df.correction == False)]["response_time"].mean()
         else:
-            rt_metric = median_rt_both
+            return df[(df.response.notnull()) & (df.correction == False)]["response_time"].median()
 
-    # return desired metric
-    print(rt_metric)
