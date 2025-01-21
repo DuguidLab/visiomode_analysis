@@ -56,7 +56,7 @@ def preservation_index(df):
         float representing the preservation index for a single session
         
     Example:
-        preservation_index = preservation_index(df)'''
+        preservation = preservation_index(df)'''
     
     return df[(df.outcome == "incorrect") & (df.correction == True)].outcome.count() / df[df.outcome == "incorrect"].outcome.count()
 
