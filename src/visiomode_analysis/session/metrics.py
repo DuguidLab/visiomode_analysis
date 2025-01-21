@@ -45,3 +45,18 @@ def d_prime(df, session_type):
 
     # Return d' 
     return d_prime
+
+def preservation_index(df):
+    '''Defines a function to calculate the preservation index for a single session
+    
+    Args:
+        df: Pandas dataframe with session data
+    
+    Output:
+        float representing the preservation index for a single session
+        
+    Example:
+        preservation_index = preservation_index(df)'''
+    
+    return df[(df.outcome == "incorrect") & (df.correction == True)].outcome.count() / df[df.outcome == "incorrect"].outcome.count()
+
