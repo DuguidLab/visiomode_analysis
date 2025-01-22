@@ -95,6 +95,34 @@ def trial_count(df, trial_type, correction):
         if correction == True:
             return df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == True)].outcome.count()
         elif correction == False:
-                return df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)].outcome.count()
+            return df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)].outcome.count()
         else:
             return df[(df.outcome == "correct") & (df.response.notnull())].outcome.count()
+    elif trial_type == "misses":
+        if correction == True:
+            return df[(df.outcome == "incorrect") & (df.response.isnull()) & (df.correction == True)].outcome.count()
+        elif correction == False:
+            return df[(df.outcome == "incorrect") & (df.response.isnull()) & (df.correction == False)].outcome.count()
+        else:
+            return df[(df.outcome == "incorrect") & (df.response.isnull())].outcome.count()
+    elif trial_type == "false_alarms":    
+        if correction == True:
+            return df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == True)].outcome.count()
+        elif correction == False:
+            return df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)].outcome.count()
+        else:
+            return df[(df.outcome == "incorrect") & (df.response.notnull())].outcome.count()
+    elif trial_type == "correct_rejections":
+        if correction == True:
+            return df[(df.outcome == "correct") & (df.response.isnull()) & (df.correction == True)].outcome.count()
+        elif correction == False:
+            return df[(df.outcome == "correct") & (df.response.isnull()) & (df.correction == False)].outcome.count()
+        else:
+            return df[(df.outcome == "correct") & (df.response.isnull())].outcome.count()
+    else:
+        if correction == True:
+            return df[(df.outcome != "precued") & (df.correction == True)].outcome.count()
+        elif correction == False:
+            return df[(df.outcome != "precued") & (df.correction == False)].outcome.count()
+        else:
+            return df[df.outcome != "precued"].outcome.count()
