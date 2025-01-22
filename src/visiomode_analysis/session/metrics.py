@@ -58,5 +58,8 @@ def preservation_index(df):
     Example:
         preservation = preservation_index(df)'''
     
-    return df[(df.outcome == "incorrect") & (df.correction == True)].outcome.count() / df[df.outcome == "incorrect"].outcome.count()
-
+    if df[df.outcome == "incorrect"].outcome.count() == 0:
+        return 0
+    else:
+        return df[(df.outcome == "incorrect") & (df.correction == True)].outcome.count() / df[df.outcome == "incorrect"].outcome.count()
+    
