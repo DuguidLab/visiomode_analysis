@@ -77,3 +77,36 @@ def rt_metric(df, trial_type, metric_type):
         else:
             return df[(df.response.notnull()) & (df.correction == False)]["response_time"].median()
 
+
+def response_bias(df):
+    '''Function to calculate response bias for a single session.
+        
+        Args:
+            df: dataframe containing session data.
+        
+        Output:
+            Float representing bias for a single session.
+        
+        Example:
+            bias = response_bias(df)'''
+    
+    hits = len(
+        df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)]
+    )
+    misses = len(
+        df[(df.outcome == "incorrect") & (df.response.isnull()) & (df.correction == False)]
+    )
+    hit_rate = (hits + 0.5) / (hits + misses + 1.0)
+
+    false_alarms = len(
+        df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)]
+    )
+
+    correct_reject = len(
+        df[(df.outcome == "correct") & (df.response.isnull()) & (df.correction == False)]
+    )
+
+    fa_rate = (false_alarms + 0.5) / (false_alarms + correct_reject + 1)
+    
+    return (norm.ppf(hit_rate) + norm.ppf(fa_rate))/-2
+
