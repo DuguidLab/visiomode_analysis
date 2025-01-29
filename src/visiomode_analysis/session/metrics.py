@@ -46,7 +46,7 @@ def d_prime(df, session_type):
     # Return d' 
     return d_prime
 
-
+ 
 def preservation_index(df):
     '''Defines a function to calculate the preservation index for a single session
     
@@ -64,7 +64,7 @@ def preservation_index(df):
     else:
         return df[(df.outcome == "incorrect") & (df.correction == True)].outcome.count() / df[df.outcome == "incorrect"].outcome.count()
     
-   
+  
 def rt_metric(df, trial_type, metric_type):
     '''Defines a function to calculate mean or median RT for different trial types
     
@@ -96,3 +96,39 @@ def rt_metric(df, trial_type, metric_type):
         else:
             return df[(df.response.notnull()) & (df.correction == False)]["response_time"].median()
 
+
+def trial_count(df, trial_type="all", correction=False, disregard_correction=True):
+    ''' Defines a function to return the number of trials, with the option of returning the number of trials for a particular trial type
+    
+    Args:
+        df: dataframe containing session data
+        trial_type: all, hits, misses, false_alarms, correct_rejections, cued, precued. Default output is total number of trials.
+        correction: "True" or "False" to specify correction or random trials, respectively. Default is False (i.e. return only random trials).
+        disregard_correction: Return trial count irrespective of whether they were correction trials. This will override the value of `correction` if True. Default is True
+        
+    Output:
+        float representing the number of trials for the specified trial type.
+    
+    Example:
+        no_of_hits = trial_count(df, hits)'''
+
+    if not disregard_correction:
+        df = df[df.correction == correction]
+
+    if trial_type == "all":
+        return df.outcome.count()
+    if trial_type == "hits":
+        return df[(df.outcome == "correct") & (df.response.notnull())].outcome.count()
+    if trial_type == "misses":
+        return df[(df.outcome == "incorrect") & (df.response.isnull())].outcome.count()
+    if trial_type == "false_alarms":
+        return df[(df.outcome == "correct") & (df.response.notnull())]
+    if trial_type == "correct_rejections":
+        return df[(df.outcome == "correct") & df(df.response.isnull())].outcome.count()
+    if trial_type == "cued":
+        return df[(df.outcome != "precued")].outcome.count()
+    if trial_type == "precued":
+        return df[(df.outcome == "precued")].outcome.count()
+    else:
+        raise ValueError(f"Invalid trial type {trial_type}")
+        
