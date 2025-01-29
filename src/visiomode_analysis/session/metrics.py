@@ -46,6 +46,7 @@ def d_prime(df, session_type):
     # Return d' 
     return d_prime
 
+
 def preservation_index(df):
     '''Defines a function to calculate the preservation index for a single session
     
@@ -63,3 +64,35 @@ def preservation_index(df):
     else:
         return df[(df.outcome == "incorrect") & (df.correction == True)].outcome.count() / df[df.outcome == "incorrect"].outcome.count()
     
+   
+def rt_metric(df, trial_type, metric_type):
+    '''Defines a function to calculate mean or median RT for different trial types
+    
+    Args:
+        df: Pandas dataframe with session data.
+        trial_type: hits or false_alarms or both (default is both)
+        metric type: mean or median (default is median)
+    
+    Output: 
+        float representing the mean/median RT for a all hit/FA trials in a session
+    
+    Example: 
+        hit_mean_RT = rt_metric(df, trial_type='hit', metric_type='mean')'''
+    
+
+    if trial_type == "hits":
+        if metric_type == "mean":
+            return df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)]["response_time"].mean()
+        else:
+            return df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)]["response_time"].median()
+    elif trial_type == "false_alarms":
+        if metric_type == "mean":
+            return df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)]["response_time"].mean()
+        else:
+            return df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)]["response_time"].median()
+    else:
+        if metric_type == "mean":
+            return df[(df.response.notnull()) & (df.correction == False)]["response_time"].mean()
+        else:
+            return df[(df.response.notnull()) & (df.correction == False)]["response_time"].median()
+
