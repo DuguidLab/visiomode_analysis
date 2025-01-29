@@ -46,6 +46,25 @@ def d_prime(df, session_type):
     # Return d' 
     return d_prime
 
+
+def preservation_index(df):
+    '''Defines a function to calculate the preservation index for a single session
+    
+    Args:
+        df: Pandas dataframe with session data
+    
+    Output:
+        float representing the preservation index for a single session
+        
+    Example:
+        preservation = preservation_index(df)'''
+    
+    if df[df.outcome == "incorrect"].outcome.count() == 0:
+        return 0
+    else:
+        return df[(df.outcome == "incorrect") & (df.correction == True)].outcome.count() / df[df.outcome == "incorrect"].outcome.count()
+    
+   
 def rt_metric(df, trial_type, metric_type):
     '''Defines a function to calculate mean or median RT for different trial types
     
