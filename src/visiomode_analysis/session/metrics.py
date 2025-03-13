@@ -65,37 +65,69 @@ def preservation_index(df):
         return df[(df.outcome == "incorrect") & (df.correction == True)].outcome.count() / df[df.outcome == "incorrect"].outcome.count()
     
   
-def rt_metric(df, trial_type, metric_type):
-    '''Defines a function to calculate mean or median RT for different trial types
+def rt_mean(df, trial_type="all", correction=False, disregard_correction=True):
+    '''Defines a function to calculate mean reaction time for different trial types.
     
     Args:
         df: Pandas dataframe with session data.
-        trial_type: hits or false_alarms or both (default is both)
-        metric type: mean or median (default is median)
+        trial_type: all, hits, false_alarms, cued, precued. Default output is total number of trials. 
+        correction: "True" or "False" to specify correction or random trials, respectively. Default is false (i.e. return only random trials)
+        disregard_correction: Return trial count irrespective of whether they are correction or random trials. This will override the value of 'correction' if True. Default is True.
     
     Output: 
-        float representing the mean/median RT for a all hit/FA trials in a session
+        float representing the mean RT for specified trials in a session
     
     Example: 
-        hit_mean_RT = rt_metric(df, trial_type='hit', metric_type='mean')'''
+        hit_mean_RT = rt_mean(df, trial_type='hit')'''
     
+    if not disregard_correction:
+        df = df[df.correction == correction]
 
+    if trial_type == "all":
+        return df[df.response.notnull()]["response_time"].mean()
     if trial_type == "hits":
-        if metric_type == "mean":
-            return df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)]["response_time"].mean()
-        else:
-            return df[(df.outcome == "correct") & (df.response.notnull()) & (df.correction == False)]["response_time"].median()
-    elif trial_type == "false_alarms":
-        if metric_type == "mean":
-            return df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)]["response_time"].mean()
-        else:
-            return df[(df.outcome == "incorrect") & (df.response.notnull()) & (df.correction == False)]["response_time"].median()
+        return df[(df.outcome == "correct") & (df.response.notnull())]["response_time"].mean()
+    if trial_type == "false_alarms":
+        return df[(df.outcome == "incorrect") & (df.response.notnull())].mean()
+    if trial_type == "cued":
+        return df[(df.outcome != "precued")].mean()
+    if trial_type == "precued":
+        return df[(df.outcome == "precued")].mean()
     else:
-        if metric_type == "mean":
-            return df[(df.response.notnull()) & (df.correction == False)]["response_time"].mean()
-        else:
-            return df[(df.response.notnull()) & (df.correction == False)]["response_time"].median()
+        raise ValueError(f"Invalid trial type {trial_type}")
 
+
+def rt_median(df, trial_type="all", correction=False, disregard_correction=True):
+  '''Defines a function to calculate median reaction time for different trial types.
+    
+    Args:
+        df: Pandas dataframe with session data.
+        trial_type: all, hits, false_alarms, cued, precued. Default output is total number of trials. 
+        correction: "True" or "False" to specify correction or random trials, respectively. Default is false (i.e. return only random trials)
+        disregard_correction: Return trial count irrespective of whether they are correction or random trials. This will override the value of 'correction' if True. Default is True.
+    
+    Output: 
+        float representing the median reaction time for specified trials in a session
+    
+    Example: 
+        hit_median_RT = rt_median(df, trial_type='hit')'''
+
+    if not disregard_correction:
+        df = df[df.correction == correction]
+
+    if trial_type == "all":
+        return df[df.response.notnull()]["response_time"].median()
+    if trial_type == "hits":
+        return df[(df.outcome == "correct") & (df.response.notnull())]["response_time"].median()
+    if trial_type == "false_alarms":
+        return df[(df.outcome == "incorrect") & (df.response.notnull())].median()
+    if trial_type == "cued":
+        return df[(df.outcome != "precued")].median()
+    if trial_type == "precued":
+        return df[(df.outcome == "precued")].median()
+    else:
+        raise ValueError(f"Invalid trial type {trial_type}")
+  
 
 def trial_count(df, trial_type="all", correction=False, disregard_correction=True):
     ''' Defines a function to return the number of trials, with the option of returning the number of trials for a particular trial type
@@ -122,7 +154,7 @@ def trial_count(df, trial_type="all", correction=False, disregard_correction=Tru
     if trial_type == "misses":
         return df[(df.outcome == "incorrect") & (df.response.isnull())].outcome.count()
     if trial_type == "false_alarms":
-        return df[(df.outcome == "correct") & (df.response.notnull())]
+        return df[(df.outcome == "incorrect") & (df.response.notnull())].outcome.count()
     if trial_type == "correct_rejections":
         return df[(df.outcome == "correct") & df(df.response.isnull())].outcome.count()
     if trial_type == "cued":
