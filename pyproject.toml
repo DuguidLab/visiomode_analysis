@@ -21,13 +21,17 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
   "pandas",
   "numpy",
-  "scipy"
+  "scipy",
+  "plotly",
+  "Jinja2",
 ]
 
 [project.urls]
@@ -35,8 +39,11 @@ Documentation = "https://github.com/DuguidLab/visiomode_analysis#readme"
 Issues = "https://github.com/DuguidLab/visiomode_analysis/issues"
 Source = "https://github.com/DuguidLab/visiomode_analysis"
 
+[project.scripts]
+visiomode-analysis = "visiomode_analysis:cli"
+
 [tool.hatch.envs.default]
-python = "3.9"
+path = ".venv"  # Use uv environment path
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/visiomode_analysis"]
