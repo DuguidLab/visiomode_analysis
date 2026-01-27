@@ -22,16 +22,6 @@
 
 import click
 
-from visiomode_analysis import session, subject, group
-from visiomode_analysis.__about__ import __version__
 
-
-@click.group()
-@click.version_option(__version__)
-def cli():
-    """Visiomode data processing CLI."""
-
-
-cli.add_command(session.session_cmd)
-cli.add_command(subject.subject_cmd)
-cli.add_command(group.group_cmd)
+@click.command("session")
+def session_cmd(): ...
