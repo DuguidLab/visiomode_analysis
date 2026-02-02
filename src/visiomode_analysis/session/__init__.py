@@ -102,6 +102,7 @@ def get_metadata(path: str) -> dict:
             "distractor": session_data.get("spec", {}).get("distractor", None),
         }
         device = session_data.get("device", "unknown")
+        notes = session_data.get("notes")
 
     return {
         "animal_id": animal_id,
@@ -113,7 +114,13 @@ def get_metadata(path: str) -> dict:
         "duration": duration,
         "session_start_time": session_start_time,
         "response_device": response_device,
+        "reward_profile": reward_profile,
+        "stimulus_duration": stimulus_duration,
+        "iti": iti,
+        "corrections_enabled": corrections_enabled,
+        "device": device,
         "stimuli": stimuli,
+        "notes": notes,
     }
 
 
