@@ -35,6 +35,11 @@ from jinja2 import select_autoescape
 
 SESSION_REPORT_TEMPLATE = "session.html"
 
+HIT = "hit"
+MISS = "miss"
+FALSE_ALARM = "false_alarm"
+CORRECT_REJECTION = "correct_rejection"
+
 
 env = Environment(loader=PackageLoader("visiomode_analysis.report", "templates"), autoescape=select_autoescape())
 
@@ -82,10 +87,21 @@ def get_metadata(path: str) -> dict:
 
     with open(path, "r") as fp:
         session_data = json.load(fp)
+
+        session_start_time = session_data.get("timestamp")
         protocol = session_data.get("protocol", "unknown")
         version = session_data.get("version", "unknown")
         duration = session_data.get("duration", "unknown")
         response_device = session_data.get("spec", {}).get("response_device", "unknown")
+        reward_profile = session_data.get("spec", {}).get("reward_profile", "unknown")
+        stimulus_duration = session_data.get("spec", {}).get("stimulus_duration", "unknown")
+        iti = session_data.get("spec", {}).get("iti", "unknown")
+        corrections_enabled = session_data.get("spec", {}).get("corrections_enabled", "unknown")
+        stimuli = {
+            "target": session_data.get("spec", {}).get("target", None),
+            "distractor": session_data.get("spec", {}).get("distractor", None),
+        }
+        device = session_data.get("device", "unknown")
 
     return {
         "animal_id": animal_id,
@@ -94,6 +110,10 @@ def get_metadata(path: str) -> dict:
         "interaction": interaction,
         "protocol": protocol,
         "version": version,
+        "duration": duration,
+        "session_start_time": session_start_time,
+        "response_device": response_device,
+        "stimuli": stimuli,
     }
 
 
@@ -163,12 +183,13 @@ def generate_report(path: str, output_dir: str = ".") -> str:
 
 
 def _flatten_trials(session):
-    session_start_time = datetime.datetime.fromisoformat(session["timestamp"])
+    metadata = get_metadata(session)
+    session_start_time = datetime.datetime.fromisoformat(metadata.get("session_start_time", ""))
 
     for trial in session.get("trials"):
         start_time = (datetime.datetime.fromisoformat(trial["timestamp"]) - session_start_time).total_seconds()
 
-        stimulus_duration = float((session.get("spec").get("stimulus_duration") or -1) / 1000)
+        stimulus_duration = float((metadata.get("stimulus_duration") or -1) / 1000)
 
         stop_time = start_time + trial["iti"] + stimulus_duration
         if trial["response"].get("timestamp"):
@@ -184,8 +205,6 @@ def _flatten_trials(session):
         dist_x = trial["response"].get("dist_x", 0)
         dist_y = trial["response"].get("dist_y", 0)
 
-        sdt_type = trial.get("sdt_type", "unavailable")
-
         stimulus = {}
         if trial.get("stimulus"):
             if trial.get("stimulus") == "None":
@@ -200,8 +219,28 @@ def _flatten_trials(session):
                     f"distractor_{key}": value for key, value in trial.get("stimulus").get("distractor").items()
                 }
                 stimulus = {**target_stim, **distractor_stim}
+        else:
+            stimulus = {
+                "target_id": metadata.get("stimuli", {}).get("target"),
+                "distractor_id": metadata.get("stimuli", {}).get("distractor"),
+            }
 
         cue_onset = start_time + trial["iti"] if stimulus else "NA"
+
+        sdt_type = None
+        if trial.get("sdt_type"):
+            sdt_type = trial.get("sdt_type")
+        elif metadata.get("protocol") == "gonogo":
+            if trial.get("response") and trial.get("outcome") == "correct":
+                sdt_type = HIT
+            elif trial.get("response") and trial.get("outcome") == "incorrect":
+                sdt_type = FALSE_ALARM
+            elif not trial.get("response") and trial.get("outcome") == "correct":
+                sdt_type = CORRECT_REJECTION
+            elif not trial.get("response") and trial.get("outcome") == "incorrect":
+                sdt_type = MISS
+            else:
+                sdt_type = "NA"
 
         yield {
             "start_time": start_time,
