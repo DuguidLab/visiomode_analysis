@@ -95,8 +95,18 @@ def get_metadata(path: str) -> dict:
         iti = float(session_data.get("spec", {}).get("iti", -1))
         corrections_enabled = session_data.get("spec", {}).get("corrections_enabled", "unknown")
         stimuli = {
-            "target": session_data.get("spec", {}).get("target", None),
-            "distractor": session_data.get("spec", {}).get("distractor", None),
+            "target_id": session_data.get("spec", {}).get("target"),
+            **{
+                f"target_{key.replace('t_', '')}": value
+                for key, value in session_data.get("spec", {}).items()
+                if key.startswith("t_")
+            },
+            "distractor_id": session_data.get("spec", {}).get("distractor"),
+            **{
+                f"distractor_{key.replace('d_', '')}": value
+                for key, value in session_data.get("spec", {}).items()
+                if key.startswith("d_")
+            },
         }
         device = session_data.get("device", "unknown")
         notes = session_data.get("notes")
@@ -121,15 +131,15 @@ def get_metadata(path: str) -> dict:
             session_date = datetime.datetime.fromisoformat(session_start_time).date()
 
         if "behaviour-" in path.split(os.sep)[-1]:
-            interaction = path.split(os.sep)[-1].split("_")[-1].replace("behaviour-", "").replace(".json", "")
+            environment = path.split(os.sep)[-1].split("_")[-1].replace("behaviour-", "").replace(".json", "")
         else:
-            interaction = session_data.get("interaction", "unknown")
+            environment = session_data.get("environment", "unknown")
 
     return {
         "animal_id": animal_id,
         "experiment": experiment,
         "session_date": session_date,
-        "interaction": interaction,
+        "environment": environment,
         "protocol": protocol,
         "version": version,
         "duration": duration,
@@ -168,7 +178,7 @@ def extract_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd
             "animal_id": metadata.get("animal_id"),
             "session_date": metadata.get("session_date"),
             "protocol": metadata.get("protocol"),
-            "interaction": metadata.get("interaction"),
+            "environment": metadata.get("environment"),
             "experiment": metadata.get("experiment"),
             **trial,
         }
@@ -181,7 +191,7 @@ def extract_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd
     df = df.replace({"hit": "correct", "false_alarm": "incorrect", "miss": "no_response"})
 
     if to_csv:
-        out_path = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date'))}_behaviour-{metadata.get('interaction')}_trials.csv"
+        out_path = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date'))}_behaviour-{metadata.get('environment')}_trials.csv"
         df.to_csv(out_path)
 
     return df
@@ -224,7 +234,12 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
                 datetime.datetime.fromisoformat(trial["response"]["timestamp"]) - session_start_time
             ).total_seconds()
 
-        response = trial.get("response").get("name") if trial.get("response") else None
+        response = trial.get("response").get("name") or "unknown" if trial.get("response") else None
+        if response == "unknown":
+            if metadata.get("environment") == "hf":
+                response = "leverpush"
+            elif metadata.get("environment") == "freelymoving":
+                response = "touch"
         response_time = trial["response_time"]
 
         pos_x = trial.get("response").get("pos_x", 0) if trial.get("response") else None
@@ -246,11 +261,30 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
                     f"distractor_{key}": value for key, value in trial.get("stimulus").get("distractor").items()
                 }
                 stimulus = {**target_stim, **distractor_stim}
-        else:
-            stimulus = {
-                "target_id": metadata.get("stimuli", {}).get("target"),
-                "distractor_id": metadata.get("stimuli", {}).get("distractor"),
-            }
+        else:  # handle older versions of visiomode
+            if metadata.get("protocol") == "gonogo" or metadata.get("protocol") == "targetonly":
+                if (trial.get("response") and trial.get("outcome") == "correct") or (
+                    not trial.get("response") and trial.get("outcome") == "incorrect"
+                ):
+                    stimulus = {
+                        **{
+                            f"stim_{key.replace('target_', '')}": value
+                            for key, value in metadata.get("stimuli", {}).items()
+                            if key.startswith("target_")
+                        },
+                    }
+                elif (trial.get("response") and trial.get("outcome") == "incorrect") or (
+                    not trial.get("response") and trial.get("outcome") == "correct"
+                ):
+                    stimulus = {
+                        **{
+                            f"stim_{key.replace('distractor_', '')}": value
+                            for key, value in metadata.get("stimuli", {}).items()
+                            if key.startswith("distractor_")
+                        },
+                    }
+            else:  # 2AFC
+                stimulus = metadata.get("stimuli", {}).items()
 
         cue_onset = start_time + trial["iti"] if stimulus else "NA"
 
