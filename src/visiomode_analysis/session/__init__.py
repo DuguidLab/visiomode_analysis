@@ -60,11 +60,11 @@ env = Environment(loader=PackageLoader("visiomode_analysis.reports", "templates"
 )
 def session_cmd(**kwargs):
     """Generate a session report and extract trials from a Visiomode JSON file."""
-    out_dir = summarise(**kwargs)
+    out_dir = create_session_report(**kwargs)
     click.echo(f"Files saved under {out_dir}")
 
 
-def summarise(path: str, output_dir: str = ".") -> str:
+def create_session_report(path: str, output_dir: str = ".") -> str:
     """Generate a session summary report and trials file from a raw Visiomode JSON.
 
     Args:
