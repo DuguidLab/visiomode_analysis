@@ -32,6 +32,8 @@ from jinja2 import Environment
 from jinja2 import PackageLoader
 from jinja2 import select_autoescape
 
+from collections.abc import Iterator
+
 
 SESSION_REPORT_TEMPLATE = "session.html"
 
@@ -41,7 +43,7 @@ FALSE_ALARM = "false_alarm"
 CORRECT_REJECTION = "correct_rejection"
 
 
-env = Environment(loader=PackageLoader("visiomode_analysis.report", "templates"), autoescape=select_autoescape())
+env = Environment(loader=PackageLoader("visiomode_analysis.reports", "templates"), autoescape=select_autoescape())
 
 
 @click.command("session")
@@ -79,23 +81,18 @@ def summarise(path: str, output_dir: str = ".") -> str:
 
 
 def get_metadata(path: str) -> dict:
-    animal_id = path.split(os.sep)[-1].split("_")[0].strip("sub-")
-    experiment = path.split(os.sep)[-1].split("_")[1].replace("exp-", "")
-
-    session_date = datetime.datetime.strptime(path.split(os.sep)[-1].split("_")[2].strip("ses-")[:8], "%Y%m%d")
-    interaction = path.split(os.sep)[-1].split("_")[-1].replace("behaviour-", "").replace(".json", "")
-
     with open(path, "r") as fp:
         session_data = json.load(fp)
 
+        # Prefer the JSON for the following
         session_start_time = session_data.get("timestamp")
         protocol = session_data.get("protocol", "unknown")
         version = session_data.get("version", "unknown")
         duration = session_data.get("duration", "unknown")
         response_device = session_data.get("spec", {}).get("response_device", "unknown")
         reward_profile = session_data.get("spec", {}).get("reward_profile", "unknown")
-        stimulus_duration = session_data.get("spec", {}).get("stimulus_duration", "unknown")
-        iti = session_data.get("spec", {}).get("iti", "unknown")
+        stimulus_duration = float(session_data.get("spec", {}).get("stimulus_duration", -1))
+        iti = float(session_data.get("spec", {}).get("iti", -1))
         corrections_enabled = session_data.get("spec", {}).get("corrections_enabled", "unknown")
         stimuli = {
             "target": session_data.get("spec", {}).get("target", None),
@@ -103,6 +100,30 @@ def get_metadata(path: str) -> dict:
         }
         device = session_data.get("device", "unknown")
         notes = session_data.get("notes")
+
+        # Prefer file name for the following, or defer to JSON if mangled
+
+        if "sub-" in path.split(os.sep)[-1]:
+            animal_id = path.split(os.sep)[-1].split("_")[0].strip("sub-")
+        else:
+            animal_id = session_data.get("animal_id", "unknown")
+
+        if "exp-" in path.split(os.sep)[-1]:
+            experiment = path.split(os.sep)[-1].split("_")[1].replace("exp-", "")
+        else:
+            experiment = session_data.get("experiment", "unknown")
+
+        if "ses-" in path.split(os.sep)[-1]:
+            session_date = datetime.datetime.strptime(
+                path.split(os.sep)[-1].split("_")[2].strip("ses-")[:8], "%Y%m%d"
+            ).date()
+        else:
+            session_date = datetime.datetime.fromisoformat(session_start_time).date()
+
+        if "behaviour-" in path.split(os.sep)[-1]:
+            interaction = path.split(os.sep)[-1].split("_")[-1].replace("behaviour-", "").replace(".json", "")
+        else:
+            interaction = session_data.get("interaction", "unknown")
 
     return {
         "animal_id": animal_id,
@@ -137,10 +158,10 @@ def extract_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd
     """
     metadata = get_metadata(path)
 
-    trials = []
+    trials: Iterator[dict]
     with open(path, "r") as fp:
         session_data = json.load(fp)
-        trials = _flatten_trials(session_data)
+        trials = _flatten_trials(session_data, metadata=metadata)
 
     session = [
         {
@@ -189,30 +210,29 @@ def generate_report(path: str, output_dir: str = ".") -> str:
     return str(out_path)
 
 
-def _flatten_trials(session):
-    metadata = get_metadata(session)
+def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
     session_start_time = datetime.datetime.fromisoformat(metadata.get("session_start_time", ""))
 
-    for trial in session.get("trials"):
+    for trial in session.get("trials", []):
         start_time = (datetime.datetime.fromisoformat(trial["timestamp"]) - session_start_time).total_seconds()
 
-        stimulus_duration = float((metadata.get("stimulus_duration") or -1) / 1000)
+        stimulus_duration = metadata.get("stimulus_duration", -1) / 1000
 
         stop_time = start_time + trial["iti"] + stimulus_duration
-        if trial["response"].get("timestamp"):
+        if trial.get("response") and trial.get("response", {}).get("timestamp"):
             stop_time = (
                 datetime.datetime.fromisoformat(trial["response"]["timestamp"]) - session_start_time
             ).total_seconds()
 
-        response = trial["response"].get("name")
+        response = trial.get("response").get("name") if trial.get("response") else None
         response_time = trial["response_time"]
 
-        pos_x = trial["response"].get("pos_x", 0)
-        pos_y = trial["response"].get("pos_y", 0)
-        dist_x = trial["response"].get("dist_x", 0)
-        dist_y = trial["response"].get("dist_y", 0)
+        pos_x = trial.get("response").get("pos_x", 0) if trial.get("response") else None
+        pos_y = trial.get("response").get("pos_y", 0) if trial.get("response") else None
+        dist_x = trial.get("response").get("dist_x", 0) if trial.get("response") else None
+        dist_y = trial.get("response").get("dist_y", 0) if trial.get("response") else None
 
-        stimulus = {}
+        stimulus: dict = {}
         if trial.get("stimulus"):
             if trial.get("stimulus") == "None":
                 stimulus = {}
