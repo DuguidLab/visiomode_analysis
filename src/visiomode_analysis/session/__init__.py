@@ -284,7 +284,7 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
                         },
                     }
             else:  # 2AFC
-                stimulus = metadata.get("stimuli", {}).items()
+                stimulus = {key: value for key, value in metadata.get("stimuli", {}).items()}
 
         cue_onset = start_time + trial["iti"] if stimulus else "NA"
 
