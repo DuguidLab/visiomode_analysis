@@ -34,6 +34,8 @@ from jinja2 import select_autoescape
 
 from collections.abc import Iterator
 
+from visiomode_analysis.session import metrics
+
 
 SESSION_REPORT_TEMPLATE = "session.html"
 
@@ -188,7 +190,7 @@ def extract_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd
     df = pd.DataFrame(session)
 
     # Convert legacy outcomes if they're still about
-    df = df.replace({"hit": "correct", "false_alarm": "incorrect", "miss": "no_response"})
+    df.outcome = df.outcome.replace({"hit": "correct", "false_alarm": "incorrect", "miss": "no_response"})
 
     if to_csv:
         out_path = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date'))}_behaviour-{metadata.get('environment')}_trials.csv"
@@ -197,7 +199,71 @@ def extract_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd
     return df
 
 
-def summarise(df: pd.DataFrame) -> dict:
+def summarise(path: str) -> dict:
+    metadata = get_metadata(path)
+    df = extract_trials(path)
+
+    # Trial counts
+    precued = len(df[(df.outcome == "precued")])
+
+    correct = len(df[(df.outcome == "correct") & (df.correction == False)])  # noqa: E712
+    correct_wc = len(df[(df.outcome == "correct")])
+    incorrect = len(df[(df.outcome == "incorrect") & (df.correction == False)])  # noqa: E712
+    incorrect_wc = len(df[(df.outcome == "incorrect")])
+
+    correction_trials = len(df[(df.outcome == "incorrect") & (df.correction == True)])  # noqa: E712
+
+    hits = len(df[(df.sdt_type == "hit") & (df.correction == False)])  # noqa: E712
+    hits_wc = len(df[(df.sdt_type == "hit")])
+
+    false_alarms = len(df[(df.sdt_type == "false_alarm") & (df.correction == False)])  # noqa: E712
+    false_alarms_wc = len(df[(df.sdt_type == "false_alarm")])
+
+    correct_rejections = len(df[(df.sdt_type == "correct_rejection") & (df.correction == False)])  # noqa: E712
+    correct_rejections_wc = len(df[(df.sdt_type == "correct_rejection")])
+
+    misses = len(df[(df.sdt_type == "miss") & (df.correction == False)])  # noqa: E712
+    misses_wc = len(df[(df.sdt_type == "miss")])
+
+    cued = hits + misses + false_alarms + correct_rejections
+    cued_wc = hits_wc + misses_wc + false_alarms_wc + correct_rejections_wc
+
+    total = cued_wc + precued
+
+    # Trial ratios
+    percentage_correct = metrics.percentage_correct(num_correct=correct, num_cued=cued)
+    percentage_correct_wc = metrics.percentage_correct(num_correct=correct_wc, num_cued=cued_wc)
+
+    cued_ratio = cued / precued if precued > 0 else 1.0
+    correction_ratio = correction_trials / incorrect if incorrect > 0 else 0.0
+
+    # Signal detection theory metrics
+    is_2afc = True if metadata.get("protocol", "").contains("afc") else False
+
+    hit_rate = (hits + 0.5) / (hits + misses + 1.0)
+    hit_rate_wc = (hits_wc + 0.5) / (hits_wc + misses_wc + 1.0)
+    fa_rate = (false_alarms + 0.5) / (correct_rejections + false_alarms + 1.0)
+    fa_rate_wc = (false_alarms_wc + 0.5) / (correct_rejections_wc + false_alarms_wc + 1.0)
+
+    d_prime = metrics.d_prime(hit_rate, fa_rate, afc_correction=is_2afc)
+    d_prime_wc = metrics.d_prime(hit_rate_wc, fa_rate_wc, afc_correction=is_2afc)
+
+    bias = metrics.bias(hit_rate, fa_rate)
+    bias_wc = metrics.bias(hit_rate_wc, fa_rate_wc)
+
+    # Perseveration
+    perseveration = metrics.perseveration(num_correction_trials=correction_trials, num_incorrect=incorrect_wc)
+
+    # Reaction time metrics
+    rt = np.median(df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"])  # noqa: E712
+    rt_wc = np.median(df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"])
+
+    rt_hits = np.median(df[(df.sdt_type == "hit") & (df.correction == False)]["response_time"])  # noqa: E712
+    rt_hits_wc = np.median(df[(df.sdt_type == "hit")]["response_time"])
+
+    rt_false_alarms = np.median(df[(df.sdt_type == "false_alarm") & (df.correction == False)]["response_time"])  # noqa: E712
+    rt_false_alarms_wc = np.median(df[(df.sdt_type == "false_alarm")]["response_time"])
+
     return {}
 
 
@@ -246,7 +312,10 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
                 response = "leverpush"
             elif metadata.get("environment") == "freelymoving":
                 response = "touch"
+
         response_time = trial["response_time"]
+        # disregard negative response times
+        response_time = np.nan if response_time < 0 else response_time
 
         pos_x = trial.get("response").get("pos_x", 0) if trial.get("response") else None
         pos_y = trial.get("response").get("pos_y", 0) if trial.get("response") else None
@@ -292,7 +361,7 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
             else:  # 2AFC
                 stimulus = {key: value for key, value in metadata.get("stimuli", {}).items()}
 
-        cue_onset = start_time + trial["iti"] if stimulus else "NA"
+        cue_onset = start_time + trial["iti"] if stimulus else np.nan
 
         sdt_type = None
         if trial.get("sdt_type"):
