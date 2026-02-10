@@ -60,11 +60,11 @@ env = Environment(loader=PackageLoader("visiomode_analysis.reports", "templates"
 )
 def session_cmd(**kwargs):
     """Generate a session report and extract trials from a Visiomode JSON file."""
-    out_dir = create_session_report(**kwargs)
+    out_dir = preprocess_session(**kwargs)
     click.echo(f"Files saved under {out_dir}")
 
 
-def create_session_report(path: str, output_dir: str = ".") -> str:
+def preprocess_session(path: str, output_dir: str = ".") -> str:
     """Generate a session summary report and trials file from a raw Visiomode JSON.
 
     Args:
@@ -197,21 +197,27 @@ def extract_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd
     return df
 
 
+def summarise(df: pd.DataFrame) -> dict:
+    return {}
+
+
 def generate_report(path: str, output_dir: str = ".") -> str:
     template = env.get_template(SESSION_REPORT_TEMPLATE)
 
+    metadata = get_metadata(path)
+
     template_identifiers = {
-        "subject_id": ...,
-        "session_date": ...,
-        "experiment_id": ...,
-        "duration": ...,
+        "subject_id": metadata.get("animal_id"),
+        "session_date": str(metadata.get("session_date")),
+        "experiment_id": metadata.get("experiment_id"),
+        "duration": metadata.get("duration"),
         "trials_num": ...,
-        "protocol": ...,
-        "response_device": ...,
-        "reward_profile": ...,
-        "iti": ...,
-        "si": ...,
-        "corrections_enabled": ...,
+        "protocol": metadata.get("protocol"),
+        "response_device": metadata.get("response_device"),
+        "reward_profile": metadata.get("reward_profile"),
+        "iti": metadata.get("iti"),
+        "si": metadata.get("si"),
+        "corrections_enabled": metadata.get("corrections_enabled"),
         "stimuli": ...,
     }
 
