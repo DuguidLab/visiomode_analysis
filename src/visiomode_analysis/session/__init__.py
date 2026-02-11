@@ -76,7 +76,7 @@ def preprocess_session(path: str, output_dir: str = ".") -> str:
     Returns:
         str: Returns directory under which files were saved
     """
-    extract_trials(path, to_csv=True, output_dir=output_dir)
+    get_trials(path, to_csv=True, output_dir=output_dir)
     generate_report(path, output_dir=output_dir)
 
     return output_dir
@@ -157,7 +157,7 @@ def get_metadata(path: str) -> dict:
     }
 
 
-def extract_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd.DataFrame:
+def get_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd.DataFrame:
     """Parse a Visiomode JSON file and return a trials dataframe. Optionally save to CSV.
 
     Args:
@@ -201,7 +201,7 @@ def extract_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd
 
 def summary(path: str) -> dict:
     metadata = get_metadata(path)
-    df = extract_trials(path)
+    df = get_trials(path)
 
     # Trial counts
     correct = len(df[(df.outcome == "correct") & (df.correction == False)])  # noqa: E712
@@ -285,6 +285,11 @@ def summary(path: str) -> dict:
     )
 
     return {
+        "animal_id": metadata.get("animal_id"),
+        "session_date": metadata.get("session_date"),
+        "protocol": metadata.get("protocol"),
+        "environment": metadata.get("environment"),
+        "experiment": metadata.get("experiment"),
         "correct": correct,
         "correct_wc": correct_wc,
         "incorrect": incorrect,
@@ -398,7 +403,7 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
                 }
                 stimulus = {**target_stim, **distractor_stim}
         else:  # handle older versions of visiomode
-            if metadata.get("protocol") == "gonogo" or metadata.get("protocol") == "targetonly":
+            if metadata.get("protocol") == "gonogo":
                 if (trial.get("response") and trial.get("outcome") == "correct") or (
                     not trial.get("response") and trial.get("outcome") == "incorrect"
                 ):
@@ -419,6 +424,17 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
                             if key.startswith("distractor_")
                         },
                     }
+            elif metadata.get("protocol") == "targetonly":
+                if (trial.get("response") and (trial.get("outcome") == "correct")) or (
+                    trial.get("outcome") == "no_response"
+                ):
+                    stimulus = {
+                        **{
+                            f"stim_{key.replace('target_', '')}": value
+                            for key, value in metadata.get("stimuli", {}).items()
+                            if key.startswith("target_")
+                        },
+                    }
             else:  # 2AFC
                 stimulus = {key: value for key, value in metadata.get("stimuli", {}).items()}
 
@@ -427,17 +443,19 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
         sdt_type = None
         if trial.get("sdt_type"):
             sdt_type = trial.get("sdt_type")
-        elif metadata.get("protocol") == "gonogo":
+        elif metadata.get("protocol") == "gonogo" or metadata.get("protocol") == "targetonly":
             if trial.get("response") and trial.get("outcome") == "correct":
                 sdt_type = HIT
             elif trial.get("response") and trial.get("outcome") == "incorrect":
                 sdt_type = FALSE_ALARM
             elif not trial.get("response") and trial.get("outcome") == "correct":
                 sdt_type = CORRECT_REJECTION
-            elif not trial.get("response") and trial.get("outcome") == "incorrect":
+            elif not trial.get("response") and (
+                trial.get("outcome") == "incorrect" or trial.get("outcome") == "no_response"
+            ):
                 sdt_type = MISS
             else:
-                sdt_type = "NA"
+                sdt_type = None
 
         yield {
             "start_time": start_time,
