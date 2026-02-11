@@ -238,7 +238,7 @@ def summary(path: str) -> dict:
     correction_ratio = correction_trials / incorrect if incorrect > 0 else 0.0
 
     # Signal detection theory metrics
-    _is_2afc = True if metadata.get("protocol", "").contains("afc") else False
+    _is_2afc = True if "afc" in metadata.get("protocol", "") else False
 
     hit_rate = (hits + 0.5) / (hits + misses + 1.0)
     hit_rate_wc = (hits_wc + 0.5) / (hits_wc + misses_wc + 1.0)
@@ -255,27 +255,33 @@ def summary(path: str) -> dict:
     perseveration = metrics.perseveration(num_correction_trials=correction_trials, num_incorrect=incorrect_wc)
 
     # Reaction time metrics
-    rt = np.median(df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"])  # noqa: E712
-    rt_wc = np.median(df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"])
+    rt = float(
+        np.median(df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"])
+    )  # noqa: E712
+    rt_wc = float(np.median(df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"]))
 
-    rt_hits = np.median(df[(df.sdt_type == "hit") & (df.correction == False)]["response_time"])  # noqa: E712
-    rt_hits_wc = np.median(df[(df.sdt_type == "hit")]["response_time"])
+    rt_hits = float(np.median(df[(df.sdt_type == "hit") & (df.correction == False)]["response_time"]))  # noqa: E712
+    rt_hits_wc = float(np.median(df[(df.sdt_type == "hit")]["response_time"]))
 
-    rt_false_alarms = np.median(df[(df.sdt_type == "false_alarm") & (df.correction == False)]["response_time"])  # noqa: E712
-    rt_false_alarms_wc = np.median(df[(df.sdt_type == "false_alarm")]["response_time"])
+    rt_false_alarms = float(np.median(df[(df.sdt_type == "false_alarm") & (df.correction == False)]["response_time"]))  # noqa: E712
+    rt_false_alarms_wc = float(np.median(df[(df.sdt_type == "false_alarm")]["response_time"]))
 
-    rt_iqr = np.percentile(
-        df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"], 75
-    ) - np.percentile(
-        df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"],
-        25,
+    rt_iqr = float(
+        np.percentile(
+            df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"], 75
+        )
+        - np.percentile(
+            df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"],
+            25,
+        )
     )
 
-    rt_iqr_wc = np.percentile(
-        df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"], 75
-    ) - np.percentile(
-        df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"],
-        25,
+    rt_iqr_wc = float(
+        np.percentile(df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"], 75)
+        - np.percentile(
+            df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"],
+            25,
+        )
     )
 
     return {
