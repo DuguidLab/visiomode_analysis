@@ -38,7 +38,3 @@ def perseveration(num_correction_trials: int, num_incorrect: int) -> float:
         return 0.0
 
     return float(num_correction_trials / num_incorrect)
-
-
-def percentage_correct(num_correct: int, num_cued: int) -> float:
-    return float((num_correct / num_cued) * 100)

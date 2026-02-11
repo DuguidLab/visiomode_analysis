@@ -231,8 +231,8 @@ def summarise(path: str) -> dict:
     total = cued_wc + precued
 
     # Trial ratios
-    percentage_correct = metrics.percentage_correct(num_correct=correct, num_cued=cued)
-    percentage_correct_wc = metrics.percentage_correct(num_correct=correct_wc, num_cued=cued_wc)
+    percentage_correct = (correct / cued) * 100
+    percentage_correct_wc = (correct_wc / cued_wc) * 100
 
     cued_ratio = cued / precued if precued > 0 else 1.0
     correction_ratio = correction_trials / incorrect if incorrect > 0 else 0.0
