@@ -199,13 +199,11 @@ def extract_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd
     return df
 
 
-def summarise(path: str) -> dict:
+def summary(path: str) -> dict:
     metadata = get_metadata(path)
     df = extract_trials(path)
 
     # Trial counts
-    precued = len(df[(df.outcome == "precued")])
-
     correct = len(df[(df.outcome == "correct") & (df.correction == False)])  # noqa: E712
     correct_wc = len(df[(df.outcome == "correct")])
     incorrect = len(df[(df.outcome == "incorrect") & (df.correction == False)])  # noqa: E712
@@ -228,6 +226,8 @@ def summarise(path: str) -> dict:
     cued = hits + misses + false_alarms + correct_rejections
     cued_wc = hits_wc + misses_wc + false_alarms_wc + correct_rejections_wc
 
+    precued = len(df[(df.outcome == "precued")])
+
     total = cued_wc + precued
 
     # Trial ratios
@@ -238,15 +238,15 @@ def summarise(path: str) -> dict:
     correction_ratio = correction_trials / incorrect if incorrect > 0 else 0.0
 
     # Signal detection theory metrics
-    is_2afc = True if metadata.get("protocol", "").contains("afc") else False
+    _is_2afc = True if metadata.get("protocol", "").contains("afc") else False
 
     hit_rate = (hits + 0.5) / (hits + misses + 1.0)
     hit_rate_wc = (hits_wc + 0.5) / (hits_wc + misses_wc + 1.0)
     fa_rate = (false_alarms + 0.5) / (correct_rejections + false_alarms + 1.0)
     fa_rate_wc = (false_alarms_wc + 0.5) / (correct_rejections_wc + false_alarms_wc + 1.0)
 
-    d_prime = metrics.d_prime(hit_rate, fa_rate, afc_correction=is_2afc)
-    d_prime_wc = metrics.d_prime(hit_rate_wc, fa_rate_wc, afc_correction=is_2afc)
+    d_prime = metrics.d_prime(hit_rate, fa_rate, afc_correction=_is_2afc)
+    d_prime_wc = metrics.d_prime(hit_rate_wc, fa_rate_wc, afc_correction=_is_2afc)
 
     bias = metrics.bias(hit_rate, fa_rate)
     bias_wc = metrics.bias(hit_rate_wc, fa_rate_wc)
@@ -264,7 +264,60 @@ def summarise(path: str) -> dict:
     rt_false_alarms = np.median(df[(df.sdt_type == "false_alarm") & (df.correction == False)]["response_time"])  # noqa: E712
     rt_false_alarms_wc = np.median(df[(df.sdt_type == "false_alarm")]["response_time"])
 
-    return {}
+    rt_iqr = np.percentile(
+        df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"], 75
+    ) - np.percentile(
+        df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"],
+        25,
+    )
+
+    rt_iqr_wc = np.percentile(
+        df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"], 75
+    ) - np.percentile(
+        df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"],
+        25,
+    )
+
+    return {
+        "correct": correct,
+        "correct_wc": correct_wc,
+        "incorrect": incorrect,
+        "incorrect_wc": incorrect_wc,
+        "correction_trials": correction_trials,
+        "hits": hits,
+        "hits_wc": hits_wc,
+        "false_alarms": false_alarms,
+        "false_alarms_wc": false_alarms_wc,
+        "correct_rejections": correct_rejections,
+        "correct_rejections_wc": correct_rejections_wc,
+        "misses": misses,
+        "misses_wc": misses_wc,
+        "cued": cued,
+        "cued_wc": cued_wc,
+        "precued": precued,
+        "total": total,
+        "percentage_correct": percentage_correct,
+        "percentage_correct_wc": percentage_correct_wc,
+        "cued_ratio": cued_ratio,
+        "correction_ratio": correction_ratio,
+        "hit_rate": hit_rate,
+        "hit_rate_wc": hit_rate_wc,
+        "fa_rate": fa_rate,
+        "fa_rate_wc": fa_rate_wc,
+        "d_prime": d_prime,
+        "d_prime_wc": d_prime_wc,
+        "bias": bias,
+        "bias_wc": bias_wc,
+        "perseveration": perseveration,
+        "rt": rt,
+        "rt_wc": rt_wc,
+        "rt_hits": rt_hits,
+        "rt_hits_wc": rt_hits_wc,
+        "rt_false_alarms": rt_false_alarms,
+        "rt_false_alarms_wc": rt_false_alarms_wc,
+        "rt_iqr": rt_iqr,
+        "rt_iqr_wc": rt_iqr_wc,
+    }
 
 
 def generate_report(path: str, output_dir: str = ".") -> str:
@@ -284,10 +337,12 @@ def generate_report(path: str, output_dir: str = ".") -> str:
         "iti": metadata.get("iti"),
         "si": metadata.get("si"),
         "corrections_enabled": metadata.get("corrections_enabled"),
-        "stimuli": ...,
+        "stimuli": metadata.get("stimuli"),
+        "notes": metadata.get("notes"),
+        "summary": summary(path=path),
     }
 
-    out_path = output_dir / Path(path.split("/")[-1].replace(".h5", "_report.html"))
+    out_path = output_dir / Path(path.split(os.sep)[-1].replace(".h5", "_report.html"))
     out_path.write_text(template.render(template_identifiers), encoding="utf-8")
     return str(out_path)
 
