@@ -25,38 +25,129 @@
             <strong>Subject ID:</strong> {{ subject_id or "Unknown" }}
         </div>
         <div class="col-md-4 mb-1">
-            <strong>Session date:</strong> {{ session_date or "Unknown" }}
+            <strong>Experiment ID:</strong> {{ experiment_id or "Unknown" }}
         </div>
         <div class="col-md-4 mb-1">
-            <strong>Experiment ID:</strong> {{ experiment_id or "Unknown" }}
+            <strong>Session duration:</strong> {{ duration or "Unknown" }} mins
         </div>
     </div>
     <div class="row mb-1">
         <div class="col-md-4 mb-1">
-            <strong>Session duration:</strong> {{ duration or "Unknown" }}
+            <strong>Session date:</strong> {{ session_date or "Unknown" }}
+        </div>
+        <div class="col-md-4 mb-1">
+            <strong>Protocol:</strong> {{ protocol or "Unknown" }}
         </div>
         <div class="col-md-4 mb-1">
             <strong>Number of trials:</strong> {{ trials_num or "Unknown" }}
         </div>
+    </div>
+
+    <h3>Protocol spec</h3>
+
+    <div class="row mb-1">
         <div class="col-md-4 mb-1">
-            <strong>File size:</strong> {{ '%0.2f'| format(filesize|float) or "Unknown" }} MB
+            <strong>Inter-trial Interval:</strong> {{ iti or "Unknown" }} ms
+        </div>
+        <div class="col-md-4 mb-1">
+            <strong>Correction trials:</strong> {{ corrections_enabled or "Unknown" }}
+        </div>
+        <div class="col-md-4 mb-1">
+            <strong>Notes:</strong>
+            <div class="row-md-4 mb-1">{{ notes }}</div>
+        </div>
+    </div>
+    <div class="row mb-1">
+        <div class="col-md-4 mb-1">
+            <strong>Stimulus interval:</strong> {{ stimulus_duration or "Unknown" }} ms
+        </div>
+        <div class="col-md-4 mb-1">
+            <strong>Stimuli:</strong>
+            <div class="row-md-4 mb-1">
+                <table>
+                    {% for key, value in stimuli.items() %}
+                    <tr>
+                        <th> &nbsp; {{ key }}: </th>
+                        <td> {{ value }} </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="row mb-3">
-    <h2 id="integrity">Timeseries integrity</h2>
+    <h2 id="integrity">Trials summary</h2>
 
     <div class="col-md-6 mb-3 mt-3">
         <h6>Timestamp series</h6>
-        {{ fig_integrity_timestamps | safe }}
+        <table>
+            {% for key, value in summary.items() %}
+            <tr>
+                <th> {{ key | capitalize }}: </th>
+                <td> {{ value }} </td>
+            </tr>
+            {% endfor %}
+        </table>
     </div>
 
     <div class="col-md-6 mb-3 mt-3">
         <h6>Timedelta series</h6>
-        {{ fig_integrity_timestamp_jumps | safe }}
     </div>
 </div>
+
+<div class="row mb-3">
+    <h2 id="integrity">Session metrics</h2>
+
+    <div class="col-md-6 mb-3 mt-3">
+        <h4>Random presentation only</h4>
+        <br>
+
+        <h6>Cue response breakdown</h6>
+        <div class="row-md-6 mb-3 mt-3">{{ fig_success_pie | safe }}</div>
+
+        <h6>Cued:uncued response ratio</h6>
+        <div class="row-md-6 mb-3 mt-3">{{ fig_cued_pie | safe }}</div>
+    </div>
+
+    <div class="col-md-6 mb-3 mt-3">
+        <h4>Correction trials included</h4>
+        <br>
+
+        <h6>Cue response breakdown</h6>
+        <div class="row-md-6 mb-3 mt-3">{{ fig_success_pie_wc | safe }}</div>
+
+        <h6>Cued:uncued response ratio</h6>
+        <div class="row-md-6 mb-3 mt-3">{{ fig_cued_pie_wc | safe }}</div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <h2 id="integrity">SDT metrics</h2>
+
+    <div class="col-md-6 mb-3 mt-3">
+
+    </div>
+
+    <div class="col-md-6 mb-3 mt-3">
+
+    </div>
+</div>
+
+<div class="row mb-3">
+    <h2 id="integrity">Trial timeseries</h2>
+
+    <div class="col-md-6 mb-3 mt-3">
+
+    </div>
+
+    <div class="col-md-6 mb-3 mt-3">
+
+    </div>
+</div>
+
+
 
 
 {% endblock %}

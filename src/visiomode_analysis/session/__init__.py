@@ -26,6 +26,7 @@ import click
 import datetime
 import pandas as pd
 import numpy as np
+import numpy.typing as npt
 
 from pathlib import Path
 from jinja2 import Environment
@@ -34,7 +35,7 @@ from jinja2 import select_autoescape
 
 from collections.abc import Iterator
 
-from visiomode_analysis.session import metrics
+from visiomode_analysis.session import metrics, plots
 
 
 SESSION_REPORT_TEMPLATE = "session.html"
@@ -199,6 +200,15 @@ def get_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd.Dat
     return df
 
 
+def get_rts(path: str, sdt_type=None) -> npt.NDArray:
+    trials = get_trials(path=path)
+
+    if sdt_type:
+        return np.array(trials[(trials.response.notnull()) & (trials.sdt_type == sdt_type)].response_time.values)
+
+    return np.array(trials[(trials.response.notnull()) & (trials.cue_onset.notnull())].response_time.values)
+
+
 def summary(path: str) -> dict:
     metadata = get_metadata(path)
     df = get_trials(path)
@@ -336,24 +346,42 @@ def generate_report(path: str, output_dir: str = ".") -> str:
 
     metadata = get_metadata(path)
 
+    session_summary = summary(path=path)
+
     template_identifiers = {
         "subject_id": metadata.get("animal_id"),
         "session_date": str(metadata.get("session_date")),
         "experiment_id": metadata.get("experiment_id"),
         "duration": metadata.get("duration"),
-        "trials_num": ...,
+        "trials_num": session_summary.get("total"),
         "protocol": metadata.get("protocol"),
         "response_device": metadata.get("response_device"),
         "reward_profile": metadata.get("reward_profile"),
         "iti": metadata.get("iti"),
-        "si": metadata.get("si"),
+        "stimulus_duration": metadata.get("stimulus_duration"),
         "corrections_enabled": metadata.get("corrections_enabled"),
         "stimuli": metadata.get("stimuli"),
         "notes": metadata.get("notes"),
-        "summary": summary(path=path),
+        "summary": session_summary,
+        "fig_success_pie": plots.plot_success_pie(
+            session_summary.get("correct", 0),
+            session_summary.get("incorrect", 0),
+            session_summary.get("miss", 0),
+            as_html=True,
+        ),
+        "fig_success_pie_wc": plots.plot_success_pie(
+            session_summary.get("correct_wc", 0),
+            session_summary.get("incorrect_wc", 0),
+            session_summary.get("miss_wc", 0),
+            as_html=True,
+        ),
+        "fig_cued_pie": plots.plot_cued_pie(session_summary.get("cued"), session_summary.get("precued"), as_html=True),
+        "fig_cued_pie_wc": plots.plot_cued_pie(
+            session_summary.get("cued_wc"), session_summary.get("precued"), as_html=True
+        ),
     }
 
-    out_path = output_dir / Path(path.split(os.sep)[-1].replace(".h5", "_report.html"))
+    out_path = output_dir / Path(path.split(os.sep)[-1].replace(".json", "_report.html"))
     out_path.write_text(template.render(template_identifiers), encoding="utf-8")
     return str(out_path)
 
