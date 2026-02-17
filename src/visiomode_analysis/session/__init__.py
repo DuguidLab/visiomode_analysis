@@ -258,8 +258,8 @@ def summary(path: str) -> dict:
     d_prime = metrics.d_prime(hit_rate, fa_rate, afc_correction=_is_2afc)
     d_prime_wc = metrics.d_prime(hit_rate_wc, fa_rate_wc, afc_correction=_is_2afc)
 
-    bias = metrics.bias(hit_rate, fa_rate)
-    bias_wc = metrics.bias(hit_rate_wc, fa_rate_wc)
+    bias = metrics.criterion(hit_rate, fa_rate)
+    bias_wc = metrics.criterion(hit_rate_wc, fa_rate_wc)
 
     # Perseveration
     perseveration = metrics.perseveration(num_correction_trials=correction_trials, num_incorrect=incorrect_wc)

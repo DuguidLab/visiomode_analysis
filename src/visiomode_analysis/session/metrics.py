@@ -21,7 +21,7 @@ def d_prime(hit_rate: float, fa_rate: float, afc_correction: bool = False) -> fl
     return d_prime
 
 
-def bias(hit_rate: float, fa_rate: float) -> float:
+def criterion(hit_rate: float, fa_rate: float) -> float:
     if hit_rate == 0 and fa_rate == 0:
         raise ValueError("Cannot calculate C with hit and false alarm rates of zero.")
 
