@@ -96,7 +96,7 @@ def get_metadata(path: str) -> dict:
         reward_profile = session_data.get("spec", {}).get("reward_profile", "unknown")
         stimulus_duration = float(session_data.get("spec", {}).get("stimulus_duration", -1))
         iti = float(session_data.get("spec", {}).get("iti", -1))
-        corrections_enabled = session_data.get("spec", {}).get("corrections_enabled", "unknown")
+        corrections_enabled = session_data.get("spec", {}).get("corrections_enabled", False)
         stimuli = {
             "target_id": session_data.get("spec", {}).get("target"),
             **{
@@ -200,8 +200,11 @@ def get_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd.Dat
     return df
 
 
-def get_rts(path: str, sdt_type=None) -> npt.NDArray:
+def get_rts(path: str, sdt_type=None, include_corrections=True) -> npt.NDArray:
     trials = get_trials(path=path)
+
+    if not include_corrections:
+        trials = trials[trials.correction == False]  # noqa: E712
 
     if sdt_type:
         return np.array(trials[(trials.response.notnull()) & (trials.sdt_type == sdt_type)].response_time.values)
@@ -378,6 +381,36 @@ def generate_report(path: str, output_dir: str = ".") -> str:
         "fig_cued_pie": plots.plot_cued_pie(session_summary.get("cued"), session_summary.get("precued"), as_html=True),
         "fig_cued_pie_wc": plots.plot_cued_pie(
             session_summary.get("cued_wc"), session_summary.get("precued"), as_html=True
+        ),
+        "fig_rt_median": plots.plot_rt_median(
+            get_rts(path=path, include_corrections=False),
+            stimulus_duration=metadata.get("stimulus_duration", 4000) / 1000,
+            as_html=True,
+        )
+        if metadata.get("protocol") == "targetonly"
+        else plots.plot_rt_medians_from_dict(
+            {
+                "all": get_rts(path=path, include_corrections=False),
+                "hits": get_rts(path=path, sdt_type="hit", include_corrections=False),
+                "false_alarms": get_rts(path=path, sdt_type="false_alarm", include_corrections=False),
+            },
+            stimulus_duration=metadata.get("stimulus_duration", 4000) / 1000,
+            as_html=True,
+        ),
+        "fig_rt_median_wc": plots.plot_rt_median(
+            get_rts(path=path, include_corrections=True),
+            stimulus_duration=metadata.get("stimulus_duration", 4000) / 1000,
+            as_html=True,
+        )
+        if metadata.get("protocol") == "targetonly"
+        else plots.plot_rt_medians_from_dict(
+            {
+                "all": get_rts(path=path, include_corrections=True),
+                "hits": get_rts(path=path, sdt_type="hit", include_corrections=True),
+                "false_alarms": get_rts(path=path, sdt_type="false_alarm", include_corrections=True),
+            },
+            stimulus_duration=metadata.get("stimulus_duration", 4000) / 1000,
+            as_html=True,
         ),
     }
 

@@ -50,7 +50,7 @@
             <strong>Inter-trial Interval:</strong> {{ iti or "Unknown" }} ms
         </div>
         <div class="col-md-4 mb-1">
-            <strong>Correction trials:</strong> {{ corrections_enabled or "Unknown" }}
+            <strong>Correction trials:</strong> {{ corrections_enabled }}
         </div>
         <div class="col-md-4 mb-1">
             <strong>Notes:</strong>
@@ -101,16 +101,22 @@
     <h2 id="integrity">Session metrics</h2>
 
     <div class="col-md-6 mb-3 mt-3">
+        {% if corrections_enabled %}
         <h4>Random presentation only</h4>
         <br>
+        {% endif %}
 
         <h6>Cue response breakdown</h6>
         <div class="row-md-6 mb-3 mt-3">{{ fig_success_pie | safe }}</div>
 
         <h6>Cued:uncued response ratio</h6>
         <div class="row-md-6 mb-3 mt-3">{{ fig_cued_pie | safe }}</div>
+
+        <h6>Median reaction time</h6>
+        <div class="row-md-6 mb-3 mt-3">{{ fig_rt_median | safe }}</div>
     </div>
 
+    {% if corrections_enabled %}
     <div class="col-md-6 mb-3 mt-3">
         <h4>Correction trials included</h4>
         <br>
@@ -120,7 +126,11 @@
 
         <h6>Cued:uncued response ratio</h6>
         <div class="row-md-6 mb-3 mt-3">{{ fig_cued_pie_wc | safe }}</div>
+
+        <h6>Median reaction time</h6>
+        <div class="row-md-6 mb-3 mt-3">{{ fig_rt_median_wc | safe }}</div>
     </div>
+    {% endif %}
 </div>
 
 <div class="row mb-3">

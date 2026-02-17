@@ -22,6 +22,8 @@
 import plotly.express as px
 import plotly.graph_objects as go
 
+import numpy as np
+
 
 def plot_success_pie(num_correct, num_incorrect, num_miss, as_html=False) -> str | go.Figure:
     labels = ["Correct", "Incorrect", "No response"]
@@ -63,10 +65,76 @@ def plot_cued_pie(num_cued, num_precued, as_html=False) -> str | go.Figure:
     return fig
 
 
-def plot_correction_pie(num_random, num_correction, as_html=False) -> str | go.Figure: ...
+def plot_correction_pie(num_random, num_correction, as_html=False) -> str | go.Figure:
+    labels = ["Random", "Correction"]
+    values = [num_random, num_correction]
+    fig = go.Figure(
+        go.Pie(
+            labels=labels,
+            values=values,
+            marker={
+                "colors": [
+                    "lightgreen",
+                    "lightred",
+                ]
+            },
+        ),
+        layout=go.Layout(
+            margin={"l": 20, "r": 20, "t": 20, "b": 20},
+        ),
+    )
+    if as_html:
+        return fig.to_html(full_html=False)
+    return fig
 
 
-def plot_rt_median(rts, as_html=False) -> str | go.Figure: ...
+def plot_rt_median(rts, stimulus_duration=4, as_html=False) -> str | go.Figure:
+    fig = go.Figure(
+        go.Scatter(
+            y=[np.median(rts)],
+            error_y=dict(
+                type="data",
+                symmetric=False,
+                array=[np.percentile(rts, 75)],
+                arrayminus=[
+                    np.percentile(rts, 25),
+                ],
+            ),
+        ),
+        layout=go.Layout(
+            margin={"l": 20, "r": 20, "t": 20, "b": 20},
+        ),
+        layout_yaxis_range=[0, stimulus_duration],
+    )
+    fig.update_xaxes(showticklabels=False)
+
+    if as_html:
+        return fig.to_html(full_html=False)
+    return fig
+
+
+def plot_rt_medians_from_dict(rt_dict: dict, stimulus_duration: int = 4, as_html=True) -> str | go.Figure:
+    fig = go.Figure(
+        go.Scatter(
+            y=[np.median(rt) for rt in rt_dict.values()],
+            x=[key for key in rt_dict.keys()],
+            error_y=dict(
+                type="data",
+                symmetric=False,
+                array=[np.percentile(rt, 75) for rt in rt_dict.values()],
+                arrayminus=[np.percentile(rt, 25) for rt in rt_dict.values()],
+            ),
+            mode="markers",
+        ),
+        layout=go.Layout(
+            margin={"l": 20, "r": 20, "t": 20, "b": 20},
+        ),
+        layout_yaxis_range=[0, stimulus_duration],
+    )
+
+    if as_html:
+        return fig.to_html(full_html=False)
+    return fig
 
 
 def plot_rt_distribution(rts, as_html=False) -> str | go.Figure: ...
