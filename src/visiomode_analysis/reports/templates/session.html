@@ -102,14 +102,14 @@
 
     <div class="col-md-6 mb-3 mt-3">
         {% if corrections_enabled %}
-        <h4>Random presentation only</h4>
+        <h4>Random presentations only</h4>
         <br>
         {% endif %}
 
         <h6>Cue response breakdown</h6>
         <div class="row-md-6 mb-3 mt-3">{{ fig_success_pie | safe }}</div>
 
-        <h6>Cued:uncued response ratio</h6>
+        <h6>Cued:uncued response breakdown</h6>
         <div class="row-md-6 mb-3 mt-3">{{ fig_cued_pie | safe }}</div>
 
         <h6>Median reaction time</h6>
@@ -118,17 +118,35 @@
 
     {% if corrections_enabled %}
     <div class="col-md-6 mb-3 mt-3">
-        <h4>Correction trials included</h4>
+        <h4>All presentations (including correction trials)</h4>
         <br>
 
         <h6>Cue response breakdown</h6>
         <div class="row-md-6 mb-3 mt-3">{{ fig_success_pie_wc | safe }}</div>
 
-        <h6>Cued:uncued response ratio</h6>
+        <h6>Cued:uncued response breakdown</h6>
         <div class="row-md-6 mb-3 mt-3">{{ fig_cued_pie_wc | safe }}</div>
 
         <h6>Median reaction time</h6>
         <div class="row-md-6 mb-3 mt-3">{{ fig_rt_median_wc | safe }}</div>
+    </div>
+
+    <div class="row mb-1">
+        <h4>Correction trial metrics</h4>
+
+        <!-- Perseveration, ratio, random/corr piechart -->
+        <div class="col-md-6 mb-3 mt-3">
+            <h6>Presentation breakdown</h6>
+            <div class="row-md-6 mb-3 mt-3">{{ fig_presentation_breakdown | safe }}</div>
+        </div>
+        <div class="col-md-3 mb-3 mt-3">
+            <h6>Presentation ratio</h6>
+            <div class="row-md-6 mb-3 mt-3">{{ fig_presentation_ratio | safe }}</div>
+        </div>
+        <div class="col-md-3 mb-3 mt-3">
+            <h6>Perseveration index</h6>
+            <div class="row-md-6 mb-3 mt-3">{{ fig_perseveration_index | safe }}</div>
+        </div>
     </div>
     {% endif %}
 </div>

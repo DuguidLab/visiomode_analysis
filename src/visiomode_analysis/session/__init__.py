@@ -248,7 +248,7 @@ def summary(path: str) -> dict:
     percentage_correct_wc = (correct_wc / cued_wc) * 100
 
     cued_ratio = cued / precued if precued > 0 else 1.0
-    correction_ratio = correction_trials / incorrect if incorrect > 0 else 0.0
+    correction_ratio = cued / correction_trials if correction_trials > 0 else 0.0
 
     # Signal detection theory metrics
     _is_2afc = True if "afc" in metadata.get("protocol", "") else False
@@ -411,6 +411,15 @@ def generate_report(path: str, output_dir: str = ".") -> str:
             },
             stimulus_duration=metadata.get("stimulus_duration", 4000) / 1000,
             as_html=True,
+        ),
+        "fig_presentation_breakdown": plots.plot_correction_pie(
+            session_summary.get("cued", 0), session_summary.get("correction_trials"), as_html=True
+        ),
+        "fig_presentation_ratio": plots.plot_single_yvalue(
+            session_summary.get("correction_ratio", 0), 0, 5, as_html=True
+        ),
+        "fig_perseveration_index": plots.plot_single_yvalue(
+            session_summary.get("perseveration", 0), 0, 1, as_html=True
         ),
     }
 

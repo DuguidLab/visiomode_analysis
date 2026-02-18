@@ -140,6 +140,21 @@ def plot_rt_medians_from_dict(rt_dict: dict, stimulus_duration: int = 4, as_html
 def plot_rt_distribution(rts, as_html=False) -> str | go.Figure: ...
 
 
+def plot_single_yvalue(value, ymin=0, ymax=1, as_html=False):
+    fig = go.Figure(
+        go.Scatter(y=[value], marker={"symbol": "x", "size": 12}),
+        layout=go.Layout(
+            margin={"l": 20, "r": 20, "t": 20, "b": 20},
+        ),
+        layout_yaxis_range=[ymin, ymax],
+    )
+    fig.update_xaxes(showticklabels=False)
+
+    if as_html:
+        return fig.to_html(full_html=False)
+    return fig
+
+
 def plot_roc(hit_rate, fa_rate, as_html=False) -> str | go.Figure: ...
 
 
