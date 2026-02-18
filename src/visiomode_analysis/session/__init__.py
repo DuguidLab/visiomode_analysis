@@ -261,8 +261,8 @@ def summary(path: str) -> dict:
     d_prime = metrics.d_prime(hit_rate, fa_rate, afc_correction=_is_2afc)
     d_prime_wc = metrics.d_prime(hit_rate_wc, fa_rate_wc, afc_correction=_is_2afc)
 
-    bias = metrics.criterion(hit_rate, fa_rate)
-    bias_wc = metrics.criterion(hit_rate_wc, fa_rate_wc)
+    decision_criterion = metrics.criterion(hit_rate, fa_rate)
+    decision_criterion_wc = metrics.criterion(hit_rate_wc, fa_rate_wc)
 
     # Perseveration
     perseveration = metrics.perseveration(num_correction_trials=correction_trials, num_incorrect=incorrect_wc)
@@ -330,8 +330,8 @@ def summary(path: str) -> dict:
         "fa_rate_wc": fa_rate_wc,
         "d_prime": d_prime,
         "d_prime_wc": d_prime_wc,
-        "bias": bias,
-        "bias_wc": bias_wc,
+        "decision_criterion": decision_criterion,
+        "decision_criterion_wc": decision_criterion_wc,
         "perseveration": perseveration,
         "rt": rt,
         "rt_wc": rt_wc,
@@ -420,6 +420,35 @@ def generate_report(path: str, output_dir: str = ".") -> str:
         ),
         "fig_perseveration_index": plots.plot_single_yvalue(
             session_summary.get("perseveration", 0), 0, 1, as_html=True
+        ),
+        "fig_roc": plots.plot_roc(
+            hit_rate=session_summary.get("hit_rate", 0),
+            fa_rate=session_summary.get("fa_rate", 0),
+            hit_rate_wc=session_summary.get("hit_rate_wc", 0),
+            fa_rate_wc=session_summary.get("fa_rate_wc", 0),
+            as_html=True,
+        ),
+        "fig_d_prime": plots.plot_dprime(
+            d_prime=session_summary.get("d_prime", 0), d_prime_wc=session_summary.get("d_prime_wc", None), as_html=True
+        ),
+        "fig_decision_criterion": plots.plot_criterion(
+            criterion=session_summary.get("decision_criterion", 0),
+            criterion_wc=session_summary.get("decision_criterion_wc", None),
+            as_html=True,
+        ),
+        "fig_response_sdt": plots.plot_sdt_pie(
+            num_hits=session_summary.get("hits", 0),
+            num_false_alarms=session_summary.get("false_alarms", 0),
+            num_correct_rejections=session_summary.get("correct_rejections", 0),
+            num_misses=session_summary.get("misses", 0),
+            as_html=True,
+        ),
+        "fig_response_sdt_wc": plots.plot_sdt_pie(
+            num_hits=session_summary.get("hits_wc", 0),
+            num_false_alarms=session_summary.get("false_alarms_wc", 0),
+            num_correct_rejections=session_summary.get("correct_rejections_wc", 0),
+            num_misses=session_summary.get("misses_wc", 0),
+            as_html=True,
         ),
     }
 

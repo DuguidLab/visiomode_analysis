@@ -32,6 +32,7 @@ def plot_success_pie(num_correct, num_incorrect, num_miss, as_html=False) -> str
         go.Pie(
             labels=labels,
             values=values,
+            marker={"colors": ["green", "salmon", "gold"]},
         ),
         layout=go.Layout(
             margin={"l": 20, "r": 20, "t": 20, "b": 20},
@@ -51,8 +52,8 @@ def plot_cued_pie(num_cued, num_precued, as_html=False) -> str | go.Figure:
             values=values,
             marker={
                 "colors": [
-                    "darkgreen",
-                    "darkorange",
+                    "skyblue",
+                    "violet",
                 ]
             },
         ),
@@ -74,8 +75,8 @@ def plot_correction_pie(num_random, num_correction, as_html=False) -> str | go.F
             values=values,
             marker={
                 "colors": [
-                    "lightgreen",
-                    "lightred",
+                    "slateblue",
+                    "orange",
                 ]
             },
         ),
@@ -140,7 +141,7 @@ def plot_rt_medians_from_dict(rt_dict: dict, stimulus_duration: int = 4, as_html
 def plot_rt_distribution(rts, as_html=False) -> str | go.Figure: ...
 
 
-def plot_single_yvalue(value, ymin=0, ymax=1, as_html=False):
+def plot_single_yvalue(value, ymin=0.0, ymax=1.0, as_html=False):
     fig = go.Figure(
         go.Scatter(
             y=[value],
@@ -149,7 +150,10 @@ def plot_single_yvalue(value, ymin=0, ymax=1, as_html=False):
         layout=go.Layout(
             margin={"l": 20, "r": 20, "t": 20, "b": 20},
         ),
-        layout_yaxis_range=[ymin, ymax],
+        layout_yaxis_range=[
+            ymin if ymin < value else value * 1.25,
+            ymax if value < ymax else value * 1.25,
+        ],
     )
     fig.update_xaxes(showticklabels=False)
 
@@ -158,7 +162,127 @@ def plot_single_yvalue(value, ymin=0, ymax=1, as_html=False):
     return fig
 
 
-def plot_roc(hit_rate, fa_rate, as_html=False) -> str | go.Figure: ...
+def plot_roc(hit_rate, fa_rate, hit_rate_wc=None, fa_rate_wc=None, as_html=False) -> str | go.Figure:
+    fig = go.Figure(
+        layout=go.Layout(
+            margin={"l": 40, "r": 40, "t": 40, "b": 40},
+        ),
+        layout_yaxis_range=[0, 1],
+        layout_xaxis_range=[0, 1],
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[fa_rate],
+            y=[hit_rate],
+            marker={"symbol": "x", "size": 12, "color": "slateblue"},
+            name="Random",
+        ),
+    )
+
+    fig.update_layout(
+        shapes=[
+            dict(
+                type="line",
+                yref="y",
+                y0=0,
+                y1=1,
+                xref="x",
+                x0=0,
+                x1=1,
+                line_dash="dash",
+                opacity=0.8,
+                fillcolor="grey",
+            )
+        ],
+        xaxis={"title": "FA rate"},
+        yaxis={"title": "Hit rate"},
+    )
+
+    if hit_rate_wc and fa_rate_wc:
+        fig.add_trace(
+            go.Scatter(
+                x=[fa_rate_wc],
+                y=[hit_rate_wc],
+                marker={"symbol": "x", "size": 12, "color": "orange"},
+                name="All",
+            ),
+        )
+
+    fig.update_layout(showlegend=True if hit_rate_wc else False)
+    fig.update_xaxes(constrain="domain")
+    fig.update_yaxes(scaleanchor="x")
+
+    if as_html:
+        return fig.to_html(full_html=False)
+    return fig
 
 
-def plot_sdt_pie(num_hits, num_false_alarms, num_correct_rejections, num_misses, as_html=False) -> str | go.Figure: ...
+def plot_dprime(d_prime, d_prime_wc=None, as_html=False):
+    fig = go.Figure(
+        go.Scatter(
+            y=[d_prime],
+            marker={"symbol": "x", "size": 12, "color": "slateblue"},
+            name="d'",
+        ),
+        layout=go.Layout(
+            margin={"l": 20, "r": 20, "t": 20, "b": 20},
+        ),
+        layout_yaxis_range=[-0.25, 4.25],
+    )
+
+    fig.add_hline(y=1.5, line_color="grey", opacity=0.8, line_dash="dash")
+    fig.add_hline(y=0.0, line_color="darkred", opacity=0.8)
+    fig.update_xaxes(showticklabels=False)
+
+    if d_prime_wc:
+        fig.add_trace(
+            go.Scatter(y=[d_prime_wc], marker={"symbol": "x", "size": 12, "color": "orange"}, name="d' (all)"),
+        )
+
+    if as_html:
+        return fig.to_html(full_html=False)
+    return fig
+
+
+def plot_criterion(criterion, criterion_wc=None, as_html=False):
+    fig = go.Figure(
+        go.Scatter(
+            y=[criterion],
+            marker={"symbol": "x", "size": 12, "color": "slateblue"},
+            name="C",
+        ),
+        layout=go.Layout(
+            margin={"l": 20, "r": 20, "t": 20, "b": 20},
+        ),
+        layout_yaxis_range=[-3.25, 3.25],
+    )
+
+    fig.add_hline(y=0.0, line_color="grey", opacity=0.8, line_dash="dash")
+    fig.update_xaxes(showticklabels=False)
+
+    if criterion_wc:
+        fig.add_trace(
+            go.Scatter(y=[criterion_wc], marker={"symbol": "x", "size": 12, "color": "orange"}, name="C (all)"),
+        )
+
+    if as_html:
+        return fig.to_html(full_html=False)
+    return fig
+
+
+def plot_sdt_pie(num_hits, num_false_alarms, num_correct_rejections, num_misses, as_html=False) -> str | go.Figure:
+    labels = ["Hits", "False alarms", "Correct rejections", "Misses"]
+    values = [num_hits, num_false_alarms, num_correct_rejections, num_misses]
+    fig = go.Figure(
+        go.Pie(
+            labels=labels,
+            values=values,
+            marker={"colors": ["darkgreen", "darksalmon", "lightgreen", "gold"]},
+        ),
+        layout=go.Layout(
+            margin={"l": 20, "r": 20, "t": 20, "b": 20},
+        ),
+    )
+    if as_html:
+        return fig.to_html(full_html=False)
+    return fig

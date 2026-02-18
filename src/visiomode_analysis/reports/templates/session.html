@@ -78,7 +78,7 @@
 </div>
 
 <div class="row mb-3">
-    <h2 id="integrity">Trials summary</h2>
+    <h2 id="integrity">Summary</h2>
 
     <div class="col-md-6 mb-3 mt-3">
         <h6>Timestamp series</h6>
@@ -100,68 +100,121 @@
 <div class="row mb-3">
     <h2 id="integrity">Session metrics</h2>
 
-    <div class="col-md-6 mb-3 mt-3">
+    <div class="col-md-6 mb-3">
         {% if corrections_enabled %}
-        <h4>Random presentations only</h4>
-        <br>
+        <div class="row mb-2">
+            <h4>Random presentations only</h4>
+        </div>
         {% endif %}
 
-        <h6>Cue response breakdown</h6>
-        {{ fig_success_pie | safe }}
+        <div class="row mb-2">
+            <h6>Cue response breakdown</h6>
+            {{ fig_success_pie | safe }}
+        </div>
 
-        <h6>Cued:uncued response breakdown</h6>
-        {{ fig_cued_pie | safe }}
+        <div class="row mb-2 mt-4">
+            <h6>Cued:uncued response breakdown</h6>
+            {{ fig_cued_pie | safe }}
+        </div>
 
-        <h6>Median reaction time</h6>
-        {{ fig_rt_median | safe }}
+        <div class="row mb-2 mt-4">
+            <h6>Median reaction time</h6>
+            {{ fig_rt_median | safe }}
+        </div>
     </div>
 
     {% if corrections_enabled %}
-    <div class="col-md-6 mb-3 mt-3">
-        <h4>All presentations (including correction trials)</h4>
-        <br>
+    <div class="col-md-6 mb-3">
+        <div class="row mb-2">
+            <h4>All presentations (including correction trials)</h4>
+        </div>
 
-        <h6>Cue response breakdown</h6>
-        {{ fig_success_pie_wc | safe }}
+        <div class="row mb-2">
+            <h6>Cue response breakdown (all trials)</h6>
+            {{ fig_success_pie_wc | safe }}
+        </div>
 
-        <h6>Cued:uncued response breakdown</h6>
-        {{ fig_cued_pie_wc | safe }}
+        <div class="row mb-2 mt-4">
+            <h6>Cued:uncued response breakdown (all trials)</h6>
+            {{ fig_cued_pie_wc | safe }}
+        </div>
 
-        <h6>Median reaction time</h6>
-        {{ fig_rt_median_wc | safe }}
+        <div class="row mb-2 mt-4">
+            <h6>Median reaction time (all trials)</h6>
+            {{ fig_rt_median_wc | safe }}
+        </div>
     </div>
+
+    <hr>
 
     <div class="row mb-1">
         <h4>Correction trial metrics</h4>
 
         <!-- Perseveration, ratio, random/corr piechart -->
-        <div class="col-md-6 mb-3 mt-3">
-            <h6>Presentation breakdown</h6>
-            {{ fig_presentation_breakdown | safe }}
+        <div class="col-md-6 mb-3">
+            <div class="row mb-2">
+                <h6>Presentation breakdown</h6>
+                {{ fig_presentation_breakdown | safe }}
+            </div>
         </div>
-        <div class="col-md-3 mb-3 mt-3">
-            <h6>Presentation ratio</h6>
-            {{ fig_presentation_ratio | safe }}
+        <div class="col-md-3 mb-3">
+            <div class="row mb-2">
+                <h6>Presentation ratio</h6>
+                {{ fig_presentation_ratio | safe }}
+            </div>
         </div>
-        <div class="col-md-3 mb-3 mt-3">
-            <h6>Perseveration index</h6>
-            {{ fig_perseveration_index | safe }}
+        <div class="col-md-3 mb-3">
+            <div class="row mb-2">
+                <h6>Perseveration index</h6>
+                {{ fig_perseveration_index | safe }}
+            </div>
         </div>
     </div>
     {% endif %}
 </div>
 
+<hr>
+
+{% if protocol != "targetonly"%}
 <div class="row mb-3">
     <h2 id="integrity">SDT metrics</h2>
 
-    <div class="col-md-6 mb-3 mt-3">
-
+    <div class="row mb-1">
+        <div class="col-md-6 mb-3 mt-3">
+            <h6>ROC curve</h6>
+            {{ fig_roc | safe }}
+        </div>
+        <div class="col-md-3 mb-3 mt-3">
+            <h6>Discriminability index (d')</h6>
+            {{ fig_d_prime | safe }}
+        </div>
+        <div class="col-md-3 mb-3 mt-3">
+            <h6>Decision criterion</h6>
+            {{ fig_decision_criterion | safe }}
+        </div>
     </div>
 
-    <div class="col-md-6 mb-3 mt-3">
+    <div class="row mb-1">
+        <div class="col-md-6 mb-3">
+            <div class="row mb-2">
+                <h6>Response type breakdown</h6>
+                {{ fig_response_sdt | safe }}
+            </div>
+        </div>
 
+        {% if corrections_enabled %}
+        <div class="col-md-6 mb-3">
+            <div class="row mb-2">
+                <h6>Response type breakdown (all trials)</h6>
+                {{ fig_response_sdt_wc | safe }}
+            </div>
+        </div>
+        {% endif %}
     </div>
+
+
 </div>
+{% endif %}
 
 <div class="row mb-3">
     <h2 id="integrity">Trial timeseries</h2>
