@@ -219,13 +219,21 @@
 <div class="row mb-3">
     <h2 id="integrity">Trial timeseries</h2>
 
-    <div class="col-md-6 mb-3 mt-3">
-
+    <div class="col-md-12 mb-3">
+        <div class="row mb-2">
+            <h6>Response timeseries</h6>
+            {{ fig_response_timeseries | safe }}
+        </div>
     </div>
 
-    <div class="col-md-6 mb-3 mt-3">
-
+    {% if protocol != "targetonly"%}
+    <div class="col-md-12 mb-3">
+        <div class="row mb-2">
+            <h6>SDT timeseries</h6>
+            {{ fig_sdt_timeseries | safe }}
+        </div>
     </div>
+    {% endif %}
 </div>
 
 

@@ -24,6 +24,19 @@ import plotly.graph_objects as go
 
 import numpy as np
 
+OUTCOME_COLORS = {
+    "correct": "green",
+    "incorrect": "salmon",
+    "no_response": "gold",
+    "precued": "violet",
+}
+SDT_COLORS = {
+    "hit": "darkgreen",
+    "false_alarm": "darksalmon",
+    "correct_rejection": "lightgreen",
+    "miss": "gold",
+}
+
 
 def plot_success_pie(num_correct, num_incorrect, num_miss, as_html=False) -> str | go.Figure:
     labels = ["Correct", "Incorrect", "No response"]
@@ -282,6 +295,47 @@ def plot_sdt_pie(num_hits, num_false_alarms, num_correct_rejections, num_misses,
         layout=go.Layout(
             margin={"l": 20, "r": 20, "t": 20, "b": 20},
         ),
+    )
+    if as_html:
+        return fig.to_html(full_html=False)
+    return fig
+
+
+def plot_trial_timeseries(trials, use_sdt=False, as_html=True):
+    fig = go.Figure(
+        layout=go.Layout(
+            margin={"l": 10, "r": 10, "t": 10, "b": 10},
+        ),
+    )
+
+    if use_sdt:
+        for sdt_type in trials.sdt_type.unique():
+            outcome_timestamps = trials[trials.sdt_type == sdt_type].stop_time.values
+            fig.add_trace(
+                go.Scatter(
+                    mode="markers",
+                    x=outcome_timestamps,
+                    y=[0 for _ in outcome_timestamps],
+                    marker={"symbol": "line-ns-open", "size": 20, "color": SDT_COLORS.get(sdt_type, "violet")},
+                    name=sdt_type,
+                ),
+            )
+    else:
+        for outcome in trials.outcome.unique():
+            outcome_timestamps = trials[trials.outcome == outcome].stop_time.values
+            fig.add_trace(
+                go.Scatter(
+                    mode="markers",
+                    x=outcome_timestamps,
+                    y=[0 for _ in outcome_timestamps],
+                    marker={"symbol": "line-ns-open", "size": 20, "color": OUTCOME_COLORS.get(outcome, "violet")},
+                    name=outcome,
+                ),
+            )
+
+    fig.update_yaxes(showticklabels=False)
+    fig.update_xaxes(
+        range=[0, max(trials.stop_time.values)],
     )
     if as_html:
         return fig.to_html(full_html=False)

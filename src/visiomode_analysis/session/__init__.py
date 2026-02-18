@@ -348,7 +348,7 @@ def generate_report(path: str, output_dir: str = ".") -> str:
     template = env.get_template(SESSION_REPORT_TEMPLATE)
 
     metadata = get_metadata(path)
-
+    trials = get_trials(path)
     session_summary = summary(path=path)
 
     template_identifiers = {
@@ -450,9 +450,13 @@ def generate_report(path: str, output_dir: str = ".") -> str:
             num_misses=session_summary.get("misses_wc", 0),
             as_html=True,
         ),
+        "fig_response_timeseries": plots.plot_trial_timeseries(trials=trials, as_html=True),
+        "fig_sdt_timeseries": plots.plot_trial_timeseries(trials=trials, use_sdt=True, as_html=True),
     }
 
-    out_path = output_dir / Path(path.split(os.sep)[-1].replace(".json", "_report.html"))
+    out_path = Path(
+        f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date'))}_behaviour-{metadata.get('environment')}_report-session.html"
+    )
     out_path.write_text(template.render(template_identifiers), encoding="utf-8")
     return str(out_path)
 
