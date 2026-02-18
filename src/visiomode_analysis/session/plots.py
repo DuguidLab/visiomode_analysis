@@ -142,7 +142,10 @@ def plot_rt_distribution(rts, as_html=False) -> str | go.Figure: ...
 
 def plot_single_yvalue(value, ymin=0, ymax=1, as_html=False):
     fig = go.Figure(
-        go.Scatter(y=[value], marker={"symbol": "x", "size": 12}),
+        go.Scatter(
+            y=[value],
+            marker={"symbol": "x", "size": 12},
+        ),
         layout=go.Layout(
             margin={"l": 20, "r": 20, "t": 20, "b": 20},
         ),
