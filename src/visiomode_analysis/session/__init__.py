@@ -194,7 +194,7 @@ def get_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd.Dat
     df.outcome = df.outcome.replace({"hit": "correct", "false_alarm": "incorrect", "miss": "no_response"})
 
     if to_csv:
-        out_path = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date'))}_behaviour-{metadata.get('environment')}_trials.csv"
+        out_path = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date'))}_behaviour-{metadata.get('protocol')}_trials.csv"
         df.to_csv(out_path)
 
     return df
@@ -455,7 +455,7 @@ def generate_report(path: str, output_dir: str = ".") -> str:
     }
 
     out_path = Path(
-        f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date'))}_behaviour-{metadata.get('environment')}_report-session.html"
+        f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date'))}_behaviour-{metadata.get('protocol')}_report-session.html"
     )
     out_path.write_text(template.render(template_identifiers), encoding="utf-8")
     return str(out_path)
