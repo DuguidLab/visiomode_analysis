@@ -39,7 +39,14 @@ import visiomode_analysis.session as session
     default=".",
     help="Output directory for report and trials files.",
 )
-def subject_cmd(**kwargs): ...
+def subject_cmd(**kwargs):
+    out_dir = preprocess_subject(**kwargs)
+    click.echo(f"Files saved under {out_dir}")
+
+
+def preprocess_subject(directory, output_dir: str = ".") -> str:
+    collate_sessions(directory=directory, output_dir=output_dir)
+    return output_dir
 
 
 def collate_sessions(directory, output_dir: str | None) -> pd.DataFrame | tuple[pd.DataFrame, str]:
