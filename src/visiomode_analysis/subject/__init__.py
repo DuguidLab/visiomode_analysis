@@ -22,6 +22,7 @@
 import os
 import click
 import glob
+import warnings
 import pandas as pd
 
 import visiomode_analysis.session as session
@@ -40,7 +41,8 @@ import visiomode_analysis.session as session
     help="Output directory for report and trials files.",
 )
 def subject_cmd(**kwargs):
-    out_dir = preprocess_subject(**kwargs)
+    with warnings.catch_warnings(action="ignore"):
+        out_dir = preprocess_subject(**kwargs)
     click.echo(f"Files saved under {out_dir}")
 
 
