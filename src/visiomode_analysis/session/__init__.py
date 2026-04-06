@@ -194,7 +194,7 @@ def get_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd.Dat
     df.outcome = df.outcome.replace({"hit": "correct", "false_alarm": "incorrect", "miss": "no_response"})
 
     if to_csv:
-        out_path = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date'))}_behaviour-{metadata.get('protocol')}_trials.csv"
+        out_path = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date')).replace('-', '')}_behaviour-{metadata.get('protocol')}_trials.csv"
         df.to_csv(out_path)
 
     return df
@@ -213,8 +213,26 @@ def get_rts(path: str, sdt_type=None, include_corrections=True) -> npt.NDArray:
 
 
 def summary(path: str) -> dict:
-    metadata = get_metadata(path)
-    df = get_trials(path)
+    """Summarise session from a JSON or trials.csv file
+
+    Args:
+        path (str): Path to (preprocessed) trials.csv or raw JSON
+
+    Returns:
+        dict: Summary dictionary
+    """
+    if path.endswith(".json"):
+        metadata = get_metadata(path)
+        df = get_trials(path)
+    else:
+        df = pd.read_csv(path)
+        metadata = {
+            "animal_id": df["animal_id"][0],
+            "session_date": df["session_date"][0],
+            "protocol": df["protocol"][0],
+            "environment": df["environment"][0],
+            "experiment": df["experiment"][0],
+        }
 
     # Trial counts
     correct = len(df[(df.outcome == "correct") & (df.correction == False)])  # noqa: E712
@@ -455,7 +473,7 @@ def generate_report(path: str, output_dir: str = ".") -> str:
     }
 
     out_path = Path(
-        f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date'))}_behaviour-{metadata.get('protocol')}_report-session.html"
+        f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date')).replace('-', '')}_behaviour-{metadata.get('protocol')}_report-session.html"
     )
     out_path.write_text(template.render(template_identifiers), encoding="utf-8")
     return str(out_path)
