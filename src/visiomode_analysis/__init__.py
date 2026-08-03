@@ -33,5 +33,6 @@ def cli():
 
 
 cli.add_command(session.session_cmd)
+cli.add_command(session.regressors_cmd)
 cli.add_command(subject.subject_cmd)
 cli.add_command(group.group_cmd)
