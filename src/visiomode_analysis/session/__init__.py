@@ -85,6 +85,32 @@ def session_cmd(**kwargs):
     click.echo(f"Files saved under {out_dir}")
 
 
+@click.command("regressors")
+@click.argument(
+    "path",
+    type=click.Path(exists=True, dir_okay=False),
+)
+@click.option(
+    "-o",
+    "--output-dir",
+    type=click.Path(dir_okay=True),
+    default=".",
+    help="Output directory for regressors files.",
+)
+@click.option(
+    "--regressor-timestamps",
+    type=click.Path(exists=True, dir_okay=False),
+    required=True,
+    help="Path to a CSV file containing timestamps for regressor generation.",
+)
+def regressors_cmd(**kwargs):
+    """Generate regressors for a session based on the protocol."""
+    trials_df = get_trials(kwargs["path"])
+    meta = get_metadata(kwargs["path"])
+    generate_regressors(trials_df, meta, kwargs["regressor_timestamps"], output_dir=kwargs["output_dir"])
+    click.echo(f"Regressors saved under {kwargs['output_dir']}")
+
+
 def preprocess_session(
     path: str,
     output_dir: str = ".",
