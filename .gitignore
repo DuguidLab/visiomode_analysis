@@ -166,3 +166,7 @@ cython_debug/
 # Ignore outputs 
 *.csv
 *.html
+
+scratch/
+scratch
+
