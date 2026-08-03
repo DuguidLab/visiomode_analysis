@@ -24,25 +24,31 @@ import pandas as pd
 
 
 def generate_gonogo_regressors(
-    trials: pd.DataFrame,
+    trials_df: pd.DataFrame,
     timestamps: np.ndarray | list,
     go_stim_id: str = "movinggrating",
     nogo_stim_id: str = "isoluminantgray",
-    ucued_push_id: str = "precued",
+    uncued_push_id: str = "uncued",
     correct_outcome_id: str = "correct",
+    lever_push_duration: float = 0.07,
+    stimulus_duration: float = 0.15,
+    reward_duration: float = 1.5,
 ) -> tuple[np.ndarray, dict]:
-    """Generate regressors for a Go/No-Go task based on trial data and metadata.
+    """Generate regressors for the Go/NoGo paradigm for a custom set of timestamps.
 
     Args:
         trials (pd.DataFrame): A DataFrame containing trial data with columns for trial type,
             start time, and stop time.
         timestamps (np.ndarray | list): An array or list of timestamps at which to evaluate the
-            regressors. This would typically correspond to the timestamps of an imaging session or other continuous recording, relative to the start time of the behavioural session.
+            regressors. This would typically correspond to the timestamps of an imaging session or other continuous recording, relative to the start time of the behavioural session. Timestamps should be in seconds and aligned to the start of the behaviour.
         go_stim_id (str, optional): The identifier for the Go stimulus. Defaults to "movinggrating".
         nogo_stim_id (str, optional): The identifier for the No-Go stimulus.
             Defaults to "isoluminantgray".
-        ucued_push_id (str, optional): The identifier for uncued push responses. Defaults to "precued".
+        uncued_push_id (str, optional): The identifier for uncued push responses. Defaults to "uncued".
         correct_outcome_id (str, optional): The identifier for correct trial outcomes. Defaults to "correct".
+        lever_push_duration (float, optional): The duration of a lever push in seconds. Defaults to 0.07,  which is lever push duration from Dacre et al. 2021.
+        stimulus_duration (float, optional): The duration of the stimulus in seconds. Defaults to 0.15.
+        reward_duration (float, optional): The duration of the reward in seconds. Defaults to 1.5.
 
     Returns:
         np.ndarray: A 2D array where each row corresponds to a timestamp and each column
@@ -50,5 +56,108 @@ def generate_gonogo_regressors(
         dict: A dictionary mapping regressor names to their corresponding column indices in the
             output array.
     """
+    regr_stim_go = []
+    regr_stim_nogo = []
+    regr_resp_cuedpush = []
+    regr_resp_uncuedpush = []
+    regr_resp_hold = []
+    regr_reward = []
 
-    return np.array([]), dict()
+    response_times = np.array(trials_df[trials_df.response.notna()].response_time.values)
+    leverpush_rt = np.nanmedian(response_times)
+
+    trial_idx = []
+
+    for idx, timestamp in enumerate(timestamps):
+        trial = trials_df[(trials_df["start_time"] < timestamp) & (trials_df["stop_time"] > timestamp)]
+        if trial.empty:
+            continue
+
+        trial_idx.append(idx)
+
+        # Stimulus regressors
+        regr_stim_go.append(
+            1
+            if (
+                (trial.stim_id.values[0] == go_stim_id)
+                & (timestamp >= trial.cue_onset.values[0])
+                & (timestamp <= trial.cue_onset.values[0] + stimulus_duration)
+            )
+            else 0
+        )
+        regr_stim_nogo.append(
+            1
+            if (
+                (trial.stim_id.values[0] == nogo_stim_id)
+                & (timestamp >= trial.cue_onset.values[0])
+                & (timestamp <= trial.cue_onset.values[0] + stimulus_duration)
+            )
+            else 0
+        )
+
+        # Response regressors
+        regr_resp_cuedpush.append(
+            1
+            if (
+                (trial.response.notna().values[0])
+                & (trial.outcome.values[0] != uncued_push_id)
+                & (timestamp >= trial.cue_onset.values[0] + leverpush_rt - lever_push_duration)
+                & (timestamp <= trial.cue_onset.values[0] + leverpush_rt)
+            )
+            else 0
+        )
+        regr_resp_uncuedpush.append(
+            1
+            if (
+                (trial.outcome.values[0] == uncued_push_id)
+                & (timestamp >= trial.stop_time.values[0] - lever_push_duration)
+                & (timestamp <= trial.stop_time.values[0])
+            )
+            else 0
+        )
+        regr_resp_hold.append(
+            1
+            if (
+                (trial.response.isna().values[0])
+                & (timestamp >= trial.cue_onset.values[0] + leverpush_rt - lever_push_duration)
+                & (timestamp <= trial.cue_onset.values[0] + leverpush_rt)
+            )
+            else 0
+        )
+
+        # Reward regressors
+        if trial.index > 0:
+            previous_trial = trials_df.iloc[trials_df.index.get_loc(trial.index[0]) - 1]  # type: ignore
+            regr_reward.append(
+                1
+                if (
+                    (previous_trial.outcome == correct_outcome_id)
+                    & (timestamp <= trial.start_time.values[0] + reward_duration)
+                )
+                else 0
+            )
+
+    if len(trial_idx) > 0:
+        regressors = np.array(
+            [
+                regr_stim_go,
+                regr_stim_nogo,
+                regr_resp_cuedpush,
+                regr_resp_uncuedpush,
+                regr_resp_hold,
+                regr_reward,
+            ]
+        ).T
+
+        regressor_names = {
+            0: "stim_go",
+            1: "stim_nogo",
+            2: "resp_cuedpush",
+            3: "resp_uncuedpush",
+            4: "resp_hold",
+            5: "reward",
+        }
+
+        return regressors, regressor_names
+    else:
+        raise ValueError("No trials found for the provided timestamps.")
