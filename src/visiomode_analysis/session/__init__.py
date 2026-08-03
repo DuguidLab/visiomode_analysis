@@ -295,29 +295,29 @@ def summary(path: str) -> dict:
         }
 
     # Trial counts
-    correct = len(df[(df.outcome == "correct") & (df.correction == False)])  # noqa: E712
-    correct_wc = len(df[(df.outcome == "correct")])
-    incorrect = len(df[(df.outcome == "incorrect") & (df.correction == False)])  # noqa: E712
-    incorrect_wc = len(df[(df.outcome == "incorrect")])
+    correct = len(df[(df["outcome"] == "correct") & (df["correction"] == False)])  # noqa: E712
+    correct_wc = len(df[(df["outcome"] == "correct")])
+    incorrect = len(df[(df["outcome"] == "incorrect") & (df["correction"] == False)])  # noqa: E712
+    incorrect_wc = len(df[(df["outcome"] == "incorrect")])
 
-    correction_trials = len(df[(df.outcome == "incorrect") & (df.correction == True)])  # noqa: E712
+    correction_trials = len(df[(df["outcome"] == "incorrect") & (df["correction"] == True)])  # noqa: E712
 
-    hits = len(df[(df.sdt_type == "hit") & (df.correction == False)])  # noqa: E712
-    hits_wc = len(df[(df.sdt_type == "hit")])
+    hits = len(df[(df["sdt_type"] == "hit") & (df["correction"] == False)])  # noqa: E712
+    hits_wc = len(df[(df["sdt_type"] == "hit")])
 
-    false_alarms = len(df[(df.sdt_type == "false_alarm") & (df.correction == False)])  # noqa: E712
-    false_alarms_wc = len(df[(df.sdt_type == "false_alarm")])
+    false_alarms = len(df[(df["sdt_type"] == "false_alarm") & (df["correction"] == False)])  # noqa: E712
+    false_alarms_wc = len(df[(df["sdt_type"] == "false_alarm")])
 
-    correct_rejections = len(df[(df.sdt_type == "correct_rejection") & (df.correction == False)])  # noqa: E712
-    correct_rejections_wc = len(df[(df.sdt_type == "correct_rejection")])
+    correct_rejections = len(df[(df["sdt_type"] == "correct_rejection") & (df["correction"] == False)])  # noqa: E712
+    correct_rejections_wc = len(df[(df["sdt_type"] == "correct_rejection")])
 
-    misses = len(df[(df.sdt_type == "miss") & (df.correction == False)])  # noqa: E712
-    misses_wc = len(df[(df.sdt_type == "miss")])
+    misses = len(df[(df["sdt_type"] == "miss") & (df["correction"] == False)])  # noqa: E712
+    misses_wc = len(df[(df["sdt_type"] == "miss")])
 
     cued = hits + misses + false_alarms + correct_rejections
     cued_wc = hits_wc + misses_wc + false_alarms_wc + correct_rejections_wc
 
-    precued = len(df[(df.outcome == "precued")])
+    precued = len(df[(df["outcome"] == "precued")])
 
     total = cued_wc + precued
 
