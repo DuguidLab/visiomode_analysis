@@ -251,7 +251,7 @@ def get_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd.Dat
     df = pd.DataFrame(session)
 
     # Convert legacy outcomes if they're still about
-    df.outcome = df.outcome.replace({"hit": "correct", "false_alarm": "incorrect", "miss": "no_response"})
+    df["outcome"] = df["outcome"].replace({"hit": "correct", "false_alarm": "incorrect", "miss": "no_response"})
 
     if to_csv:
         out_path = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date')).replace('-', '')}_behaviour-{metadata.get('protocol')}_trials.csv"
