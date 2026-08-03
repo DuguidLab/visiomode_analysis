@@ -262,8 +262,8 @@ def summary(path: str) -> dict:
     total = cued_wc + precued
 
     # Trial ratios
-    percentage_correct = (correct / cued) * 100
-    percentage_correct_wc = (correct_wc / cued_wc) * 100
+    percentage_correct = (correct / cued) * 100 if cued > 0 else 100
+    percentage_correct_wc = (correct_wc / cued_wc) * 100 if cued_wc > 0 else 100
 
     cued_ratio = cued / precued if precued > 0 else 1.0
     correction_ratio = cued / correction_trials if correction_trials > 0 else 0.0
@@ -297,23 +297,27 @@ def summary(path: str) -> dict:
     rt_false_alarms = float(np.median(df[(df.sdt_type == "false_alarm") & (df.correction == False)]["response_time"]))  # noqa: E712
     rt_false_alarms_wc = float(np.median(df[(df.sdt_type == "false_alarm")]["response_time"]))
 
-    rt_iqr = float(
-        np.percentile(
-            df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"], 75
+    try:
+        rt_iqr = float(
+            np.percentile(
+                df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"], 75
+            )
+            - np.percentile(
+                df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"],
+                25,
+            )
         )
-        - np.percentile(
-            df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"],
-            25,
-        )
-    )
 
-    rt_iqr_wc = float(
-        np.percentile(df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"], 75)
-        - np.percentile(
-            df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"],
-            25,
+        rt_iqr_wc = float(
+            np.percentile(df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"], 75)
+            - np.percentile(
+                df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"],
+                25,
+            )
         )
-    )
+    except IndexError:
+        rt_iqr = np.nan
+        rt_iqr_wc = np.nan
 
     return {
         "animal_id": metadata.get("animal_id"),
