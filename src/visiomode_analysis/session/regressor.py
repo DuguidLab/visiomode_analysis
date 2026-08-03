@@ -56,108 +56,86 @@ def generate_gonogo_regressors(
         dict: A dictionary mapping regressor names to their corresponding column indices in the
             output array.
     """
-    regr_stim_go = []
-    regr_stim_nogo = []
-    regr_resp_cuedpush = []
-    regr_resp_uncuedpush = []
-    regr_resp_hold = []
-    regr_reward = []
+    timestamps = np.asarray(timestamps, dtype=float)
 
     response_times = np.array(trials_df[trials_df.response.notna()].response_time.values)
     leverpush_rt = np.nanmedian(response_times)
 
-    trial_idx = []
+    start_time = trials_df["start_time"].to_numpy(dtype=float)
+    stop_time = trials_df["stop_time"].to_numpy(dtype=float)
+    cue_onset = trials_df["cue_onset"].to_numpy(dtype=float)
+    stim_id = trials_df["stim_id"].to_numpy()
+    outcome = trials_df["outcome"].to_numpy()
+    leverpush = trials_df["response"].notna().to_numpy()
 
-    for idx, timestamp in enumerate(timestamps):
-        trial = trials_df[(trials_df["start_time"] < timestamp) & (trials_df["stop_time"] > timestamp)]
-        if trial.empty:
-            continue
+    # For every timestamp find the index of the trial that contains it (start_time < ts < stop_time).
+    ts_indexes = np.searchsorted(start_time, timestamps, side="right") - 1
+    trial_entries = ts_indexes >= 0
+    trial_entries[trial_entries] &= start_time[ts_indexes[trial_entries]] < timestamps[trial_entries]
+    trial_entries[trial_entries] &= stop_time[ts_indexes[trial_entries]] > timestamps[trial_entries]
 
-        trial_idx.append(idx)
+    trial_idx = np.nonzero(trial_entries)[0]
 
-        # Stimulus regressors
-        regr_stim_go.append(
-            1
-            if (
-                (trial.stim_id.values[0] == go_stim_id)
-                & (timestamp >= trial.cue_onset.values[0])
-                & (timestamp <= trial.cue_onset.values[0] + stimulus_duration)
-            )
-            else 0
-        )
-        regr_stim_nogo.append(
-            1
-            if (
-                (trial.stim_id.values[0] == nogo_stim_id)
-                & (timestamp >= trial.cue_onset.values[0])
-                & (timestamp <= trial.cue_onset.values[0] + stimulus_duration)
-            )
-            else 0
-        )
-
-        # Response regressors
-        regr_resp_cuedpush.append(
-            1
-            if (
-                (trial.response.notna().values[0])
-                & (trial.outcome.values[0] != uncued_push_id)
-                & (timestamp >= trial.cue_onset.values[0] + leverpush_rt - lever_push_duration)
-                & (timestamp <= trial.cue_onset.values[0] + leverpush_rt)
-            )
-            else 0
-        )
-        regr_resp_uncuedpush.append(
-            1
-            if (
-                (trial.outcome.values[0] == uncued_push_id)
-                & (timestamp >= trial.stop_time.values[0] - lever_push_duration)
-                & (timestamp <= trial.stop_time.values[0])
-            )
-            else 0
-        )
-        regr_resp_hold.append(
-            1
-            if (
-                (trial.response.isna().values[0])
-                & (timestamp >= trial.cue_onset.values[0] + leverpush_rt - lever_push_duration)
-                & (timestamp <= trial.cue_onset.values[0] + leverpush_rt)
-            )
-            else 0
-        )
-
-        # Reward regressors
-        if trial.index > 0:
-            previous_trial = trials_df.iloc[trials_df.index.get_loc(trial.index[0]) - 1]  # type: ignore
-            regr_reward.append(
-                1
-                if (
-                    (previous_trial.outcome == correct_outcome_id)
-                    & (timestamp <= trial.start_time.values[0] + reward_duration)
-                )
-                else 0
-            )
-
-    if len(trial_idx) > 0:
-        regressors = np.array(
-            [
-                regr_stim_go,
-                regr_stim_nogo,
-                regr_resp_cuedpush,
-                regr_resp_uncuedpush,
-                regr_resp_hold,
-                regr_reward,
-            ]
-        ).T
-
-        regressor_names = {
-            0: "stim_go",
-            1: "stim_nogo",
-            2: "resp_cuedpush",
-            3: "resp_uncuedpush",
-            4: "resp_hold",
-            5: "reward",
-        }
-
-        return regressors, regressor_names
-    else:
+    if len(trial_idx) == 0:
         raise ValueError("No trials found for the provided timestamps.")
+
+    ts = timestamps[trial_idx]
+    trial_idx = ts_indexes[trial_idx]
+
+    # Stimulus regressors
+    regr_stim_go = (
+        (stim_id[trial_idx] == go_stim_id)
+        & (ts >= cue_onset[trial_idx])
+        & (ts <= cue_onset[trial_idx] + stimulus_duration)
+    ).astype(int)
+    regr_stim_nogo = (
+        (stim_id[trial_idx] == nogo_stim_id)
+        & (ts >= cue_onset[trial_idx])
+        & (ts <= cue_onset[trial_idx] + stimulus_duration)
+    ).astype(int)
+
+    # Response regressors
+    push_window_start = cue_onset[trial_idx] + leverpush_rt - lever_push_duration
+    push_window_end = cue_onset[trial_idx] + leverpush_rt
+    regr_resp_cuedpush = (
+        leverpush[trial_idx]
+        & (outcome[trial_idx] != uncued_push_id)
+        & (ts >= push_window_start)
+        & (ts <= push_window_end)
+    ).astype(int)
+    regr_resp_uncuedpush = (
+        (outcome[trial_idx] == uncued_push_id)
+        & (ts >= stop_time[trial_idx] - lever_push_duration)
+        & (ts <= stop_time[trial_idx])
+    ).astype(int)
+    regr_resp_hold = (~leverpush[trial_idx] & (ts >= push_window_start) & (ts <= push_window_end)).astype(int)
+
+    # Reward regressor, depends on previous trial
+    has_previous = trial_idx > 0
+    previous_outcome = np.where(has_previous, outcome[np.maximum(trial_idx - 1, 0)], None)  # type: ignore
+    regr_reward = (
+        has_previous & (previous_outcome == correct_outcome_id) & (ts <= start_time[trial_idx] + reward_duration)
+    ).astype(int)
+
+    regressors = np.stack(
+        [
+            regr_stim_go,
+            regr_stim_nogo,
+            regr_resp_cuedpush,
+            regr_resp_uncuedpush,
+            regr_resp_hold,
+            regr_reward,
+        ],
+        axis=1,
+    )
+
+    regressor_names = {
+        0: "stim_go",
+        1: "stim_nogo",
+        2: "resp_cuedpush",
+        3: "resp_uncuedpush",
+        4: "resp_hold",
+        5: "reward",
+    }
+
+    return regressors, regressor_names
