@@ -36,6 +36,7 @@ from jinja2 import select_autoescape
 from collections.abc import Iterator
 
 from visiomode_analysis.session import metrics, plots
+import visiomode_analysis.session.regressor as rgr
 
 
 SESSION_REPORT_TEMPLATE = "session.html"
@@ -61,24 +62,57 @@ env = Environment(loader=PackageLoader("visiomode_analysis.reports", "templates"
     default=".",
     help="Output directory for report and trials files.",
 )
+@click.option(
+    "--no-report",
+    is_flag=True,
+    default=False,
+    help="If set, do not generate a session report.",
+)
+@click.option(
+    "--with-regressors",
+    is_flag=True,
+    default=False,
+    help="If set, generate regressors for the session.",
+)
+@click.option(
+    "--regressor-timestamps",
+    type=click.Path(exists=True, dir_okay=False),
+    help="Path to a CSV file containing timestamps for regressor generation.",
+)
 def session_cmd(**kwargs):
     """Generate a session report and extract trials from a Visiomode JSON file."""
     out_dir = preprocess_session(**kwargs)
     click.echo(f"Files saved under {out_dir}")
 
 
-def preprocess_session(path: str, output_dir: str = ".") -> str:
+def preprocess_session(
+    path: str,
+    output_dir: str = ".",
+    no_report: bool = False,
+    with_regressors: bool = False,
+    regressor_timestamps: str | None = None,
+) -> str:
     """Generate a session summary report and trials file from a raw Visiomode JSON.
 
     Args:
         path (str): Path to Visiomode JSON file.
         output_dir (str, optional): Output directory for report and trials files. Defaults to ".".
-
+        no_report (bool, optional): Whether to generate a session report. Defaults to False.
+        with_regressors (bool, optional): Whether to generate regressors for the session. Defaults to False.
+        regressor_timestamps (str, optional): Path to a CSV file containing timestamps for regressor generation. Defaults to None.
     Returns:
         str: Returns directory under which files were saved
     """
-    get_trials(path, to_csv=True, output_dir=output_dir)
-    generate_report(path, output_dir=output_dir)
+    trials_df = get_trials(path, to_csv=True, output_dir=output_dir)
+    meta = get_metadata(path)
+
+    if not no_report:
+        generate_report(path, output_dir=output_dir)
+
+    if with_regressors:
+        if not regressor_timestamps:
+            raise ValueError("Regressor timestamps file must be provided when generating regressors.")
+        generate_regressors(trials_df, meta, regressor_timestamps, output_dir=output_dir)
 
     return output_dir
 
@@ -364,6 +398,53 @@ def summary(path: str) -> dict:
         "rt_iqr": rt_iqr,
         "rt_iqr_wc": rt_iqr_wc,
     }
+
+
+def generate_regressors(
+    trials_df: pd.DataFrame, metadata: dict, regressor_timestamps_path: str, output_dir: str = "."
+) -> tuple[np.ndarray, dict]:
+    """Generate regressors for the session based on the protocol.
+
+    Timestamps are recalculated to align to the start of the behaviour session, based on the session start time in the metadata.
+
+    Args:
+        trials_df (pd.DataFrame): A DataFrame containing trial data with columns for trial type,
+            start time, and stop time.
+        metadata (dict): A dictionary containing session metadata.
+        regressor_timestamps_path (str): Path to a CSV file containing timestamps for regressor generation. Typically corresponds to the timestamps of an imaging session or other continuous recording and should be in ISO format.
+        output_dir (str, optional): Output directory for saving regressors. Defaults to ".".
+
+    Returns:
+        tuple[np.ndarray, dict]: A tuple containing the regressors array and a dictionary mapping regressor names to their corresponding column indices in the output array.
+
+    Raises:
+        NotImplementedError: If the protocol specified in the metadata is not supported for regressor generation.
+
+    Note:
+        The output regressors are saved as a .npz file which contains the regressors array, labels, and recalculated timestamps.
+    """
+
+    source_timestamps = pd.read_csv(regressor_timestamps_path).to_numpy().flatten()
+    session_start_time = datetime.datetime.fromisoformat(metadata.get("session_start_time", ""))
+
+    # recalculate timestamps to align to behaviour
+    timestamps = [
+        (datetime.datetime.fromisoformat(timestamp.decode("utf-8")) - session_start_time).total_seconds()
+        for timestamp in source_timestamps
+    ]
+
+    if metadata.get("protocol") == "gonogo":
+        regressors, labels = rgr.generate_gonogo_regressors(trials_df, timestamps)
+        np.savez(
+            f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date')).replace('-', '')}_behaviour-{metadata.get('protocol')}_regressors.npz",
+            regressors=regressors,
+            labels=np.array(list(labels.values())),
+            timestamps=np.array(timestamps),
+        )
+    else:
+        raise NotImplementedError(f"Regressor generation not implemented for protocol {metadata.get('protocol')}.")
+
+    return regressors, labels
 
 
 def generate_report(path: str, output_dir: str = ".") -> str:
