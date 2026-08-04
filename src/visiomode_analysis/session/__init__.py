@@ -453,14 +453,14 @@ def generate_regressors(
     if regressor_timestamps_path.endswith(".csv"):
         source_timestamps = pd.read_csv(regressor_timestamps_path).to_numpy().flatten()
     elif regressor_timestamps_path.endswith(".txt"):
-        source_timestamps = np.loadtxt(regressor_timestamps_path)
+        source_timestamps = np.loadtxt(regressor_timestamps_path, dtype=str)
     else:
         raise ValueError("Regressor timestamps file must be in CSV or TXT format.")
     session_start_time = datetime.datetime.fromisoformat(metadata.get("session_start_time", ""))
 
     # recalculate timestamps to align to behaviour
     timestamps = [
-        (datetime.datetime.fromisoformat(timestamp.decode("utf-8")) - session_start_time).total_seconds()
+        (datetime.datetime.fromisoformat(timestamp) - session_start_time).total_seconds()
         for timestamp in source_timestamps
     ]
 
