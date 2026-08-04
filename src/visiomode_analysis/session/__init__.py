@@ -437,7 +437,7 @@ def generate_regressors(
         trials_df (pd.DataFrame): A DataFrame containing trial data with columns for trial type,
             start time, and stop time.
         metadata (dict): A dictionary containing session metadata.
-        regressor_timestamps_path (str): Path to a CSV file containing timestamps for regressor generation. Typically corresponds to the timestamps of an imaging session or other continuous recording and should be in ISO format.
+        regressor_timestamps_path (str): Path to a CSV or TXT file containing timestamps for regressor generation. Typically corresponds to the timestamps of an imaging session or other continuous recording and should be in ISO format.
         output_dir (str, optional): Output directory for saving regressors. Defaults to ".".
 
     Returns:
@@ -450,7 +450,12 @@ def generate_regressors(
         The output regressors are saved as a .npz file which contains the regressors array, labels, and recalculated timestamps.
     """
 
-    source_timestamps = pd.read_csv(regressor_timestamps_path).to_numpy().flatten()
+    if regressor_timestamps_path.endswith(".csv"):
+        source_timestamps = pd.read_csv(regressor_timestamps_path).to_numpy().flatten()
+    elif regressor_timestamps_path.endswith(".txt"):
+        source_timestamps = np.loadtxt(regressor_timestamps_path)
+    else:
+        raise ValueError("Regressor timestamps file must be in CSV or TXT format.")
     session_start_time = datetime.datetime.fromisoformat(metadata.get("session_start_time", ""))
 
     # recalculate timestamps to align to behaviour
