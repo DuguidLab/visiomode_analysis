@@ -74,13 +74,13 @@ def generate_gonogo_regressors(
     trial_entries[trial_entries] &= start_time[ts_indexes[trial_entries]] < timestamps[trial_entries]
     trial_entries[trial_entries] &= stop_time[ts_indexes[trial_entries]] > timestamps[trial_entries]
 
-    trial_idx = np.nonzero(trial_entries)[0]
+    entry_idx = np.nonzero(trial_entries)[0]
 
-    if len(trial_idx) == 0:
+    if len(entry_idx) == 0:
         raise ValueError("No trials found for the provided timestamps.")
 
-    ts = timestamps[trial_idx]
-    trial_idx = ts_indexes[trial_idx]
+    ts = timestamps[entry_idx]
+    trial_idx = ts_indexes[entry_idx]
 
     # Stimulus regressors
     regr_stim_go = (
@@ -117,7 +117,9 @@ def generate_gonogo_regressors(
         has_previous & (previous_outcome == correct_outcome_id) & (ts <= start_time[trial_idx] + reward_duration)
     ).astype(int)
 
-    regressors = np.stack(
+    # Timestamps that fall outside every trial window (e.g. inter-trial intervals) get all-zero rows, so the output always matches the length of the input timestamps.
+    regressors = np.zeros((len(timestamps), 6), dtype=int)
+    regressors[entry_idx] = np.stack(
         [
             regr_stim_go,
             regr_stim_nogo,
