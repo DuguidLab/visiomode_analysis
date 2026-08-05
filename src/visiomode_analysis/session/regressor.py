@@ -28,12 +28,12 @@ def generate_gonogo_regressors(
     timestamps: np.ndarray | list,
     go_stim_id: str = "movinggrating",
     nogo_stim_id: str = "isoluminantgray",
-    uncued_push_id: str = "uncued",
+    uncued_push_id: str = "precued",
     correct_outcome_id: str = "correct",
-    lever_push_duration: float = 0.07,
-    stimulus_duration: float = 0.15,
+    lever_push_duration: float = 0.08,
     reward_duration: float = 1.5,
-) -> tuple[np.ndarray, dict]:
+    trial_epoch_only: bool = False,
+) -> tuple[np.ndarray, dict, np.ndarray]:
     """Generate regressors for the Go/NoGo paradigm for a custom set of timestamps.
 
     Args:
@@ -46,19 +46,20 @@ def generate_gonogo_regressors(
             Defaults to "isoluminantgray".
         uncued_push_id (str, optional): The identifier for uncued push responses. Defaults to "uncued".
         correct_outcome_id (str, optional): The identifier for correct trial outcomes. Defaults to "correct".
-        lever_push_duration (float, optional): The duration of a lever push in seconds. Defaults to 0.07,  which is lever push duration from Dacre et al. 2021.
-        stimulus_duration (float, optional): The duration of the stimulus in seconds. Defaults to 0.15.
+        lever_push_duration (float, optional): The duration of a lever push in seconds. Defaults to 0.08,  which is lever push duration from Dacre et al. 2021.
         reward_duration (float, optional): The duration of the reward in seconds. Defaults to 1.5.
+        trial_epoch_only (bool, optional): If True, only timestamps that fall within the trial epochs will be considered for regressor generation. Timestamps outside of trial epochs will be ignored. Defaults to False.
 
     Returns:
         np.ndarray: A 2D array where each row corresponds to a timestamp and each column
             corresponds to a regressor (e.g., stimulus, response, reward).
         dict: A dictionary mapping regressor names to their corresponding column indices in the
             output array.
+        trial_entries (np.ndarray): A boolean array indicating which timestamps fall within trial epochs. True for timestamps that are within a trial, False otherwise.
     """
     timestamps = np.asarray(timestamps, dtype=float)
 
-    response_times = np.array(trials_df[trials_df.response.notna()].response_time.values)
+    response_times = np.array(trials_df[trials_df.sdt_type == "hit"].response_time.values)
     leverpush_rt = np.nanmedian(response_times)
 
     start_time = trials_df["start_time"].to_numpy(dtype=float)
@@ -86,28 +87,32 @@ def generate_gonogo_regressors(
     regr_stim_go = (
         (stim_id[trial_idx] == go_stim_id)
         & (ts >= cue_onset[trial_idx])
-        & (ts <= cue_onset[trial_idx] + stimulus_duration)
+        & (ts <= stop_time[trial_idx] - lever_push_duration)
     ).astype(int)
     regr_stim_nogo = (
         (stim_id[trial_idx] == nogo_stim_id)
         & (ts >= cue_onset[trial_idx])
-        & (ts <= cue_onset[trial_idx] + stimulus_duration)
+        & (ts <= cue_onset[trial_idx] + leverpush_rt - lever_push_duration)
+        # & (ts <= stop_time[trial_idx] - (leverpush_rt + lever_push_duration))
     ).astype(int)
 
     # Response regressors
-    push_window_start = cue_onset[trial_idx] + leverpush_rt - lever_push_duration
-    push_window_end = cue_onset[trial_idx] + leverpush_rt
     regr_resp_cuedpush = (
         leverpush[trial_idx]
-        & (outcome[trial_idx] != uncued_push_id)
-        & (ts >= push_window_start)
-        & (ts <= push_window_end)
-    ).astype(int)
-    regr_resp_uncuedpush = (
-        (outcome[trial_idx] == uncued_push_id)
+        & ((stim_id[trial_idx] == go_stim_id) | (stim_id[trial_idx] == nogo_stim_id))
         & (ts >= stop_time[trial_idx] - lever_push_duration)
         & (ts <= stop_time[trial_idx])
     ).astype(int)
+    regr_resp_uncuedpush = (
+        leverpush[trial_idx]
+        & (outcome[trial_idx] == uncued_push_id)
+        & (ts >= stop_time[trial_idx] - lever_push_duration)
+        & (ts <= stop_time[trial_idx])
+    ).astype(int)
+
+    # define hold regressor based on average lever push RT
+    push_window_start = cue_onset[trial_idx] + leverpush_rt - lever_push_duration
+    push_window_end = cue_onset[trial_idx] + leverpush_rt
     regr_resp_hold = (~leverpush[trial_idx] & (ts >= push_window_start) & (ts <= push_window_end)).astype(int)
 
     # Reward regressor, depends on previous trial
@@ -117,19 +122,33 @@ def generate_gonogo_regressors(
         has_previous & (previous_outcome == correct_outcome_id) & (ts <= start_time[trial_idx] + reward_duration)
     ).astype(int)
 
-    # Timestamps that fall outside every trial window (e.g. inter-trial intervals) get all-zero rows, so the output always matches the length of the input timestamps.
-    regressors = np.zeros((len(timestamps), 6), dtype=int)
-    regressors[entry_idx] = np.stack(
-        [
-            regr_stim_go,
-            regr_stim_nogo,
-            regr_resp_cuedpush,
-            regr_resp_uncuedpush,
-            regr_resp_hold,
-            regr_reward,
-        ],
-        axis=1,
-    )
+    if not trial_epoch_only:
+        # Timestamps that fall outside every trial window (e.g. inter-trial intervals) get all-zero rows, so the output always matches the length of the input timestamps.
+        regressors = np.zeros((len(timestamps), 6), dtype=int)
+        regressors[entry_idx] = np.stack(
+            [
+                regr_stim_go,
+                regr_stim_nogo,
+                regr_resp_cuedpush,
+                regr_resp_uncuedpush,
+                regr_resp_hold,
+                regr_reward,
+            ],
+            axis=1,
+        )
+    else:
+        # Only return timestamps that fall within trial epochs
+        regressors = np.stack(
+            [
+                regr_stim_go,
+                regr_stim_nogo,
+                regr_resp_cuedpush,
+                regr_resp_uncuedpush,
+                regr_resp_hold,
+                regr_reward,
+            ],
+            axis=1,
+        )
 
     regressor_names = {
         0: "stim_go",
@@ -140,4 +159,4 @@ def generate_gonogo_regressors(
         5: "reward",
     }
 
-    return regressors, regressor_names
+    return regressors, regressor_names, trial_entries
