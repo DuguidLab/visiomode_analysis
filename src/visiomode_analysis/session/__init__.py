@@ -428,7 +428,7 @@ def summary(path: str) -> dict:
 
 def generate_regressors(
     trials_df: pd.DataFrame, metadata: dict, regressor_timestamps_path: str, output_dir: str = "."
-) -> tuple[np.ndarray, dict]:
+) -> str:
     """Generate regressors for the session based on the protocol.
 
     Timestamps are recalculated to align to the start of the behaviour session, based on the session start time in the metadata.
@@ -441,7 +441,7 @@ def generate_regressors(
         output_dir (str, optional): Output directory for saving regressors. Defaults to ".".
 
     Returns:
-        tuple[np.ndarray, dict]: A tuple containing the regressors array and a dictionary mapping regressor names to their corresponding column indices in the output array.
+        str: Path to the generated regressors file.
 
     Raises:
         NotImplementedError: If the protocol specified in the metadata is not supported for regressor generation.
@@ -464,18 +464,21 @@ def generate_regressors(
         for timestamp in source_timestamps
     ]
 
+    outpath = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date')).replace('-', '')}_behaviour-{metadata.get('protocol')}_regressors.npz"
+
     if metadata.get("protocol") == "gonogo":
-        regressors, labels = rgr.generate_gonogo_regressors(trials_df, timestamps)
+        regressors, labels, trial_idx = rgr.generate_gonogo_regressors(trials_df, timestamps, trial_epoch_only=True)
         np.savez(
-            f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date')).replace('-', '')}_behaviour-{metadata.get('protocol')}_regressors.npz",
+            outpath,
             regressors=regressors,
             labels=np.array(list(labels.values())),
             timestamps=np.array(timestamps),
+            trial_idx=trial_idx,
         )
     else:
         raise NotImplementedError(f"Regressor generation not implemented for protocol {metadata.get('protocol')}.")
 
-    return regressors, labels
+    return outpath
 
 
 def generate_report(path: str, output_dir: str = ".") -> str:
