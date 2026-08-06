@@ -211,7 +211,8 @@ def plot_roc(hit_rate, fa_rate, hit_rate_wc=None, fa_rate_wc=None, as_html=False
         yaxis={"title": "Hit rate"},
     )
 
-    if hit_rate_wc and fa_rate_wc:
+    has_wc = hit_rate_wc is not None and fa_rate_wc is not None
+    if has_wc:
         fig.add_trace(
             go.Scatter(
                 x=[fa_rate_wc],
@@ -221,7 +222,7 @@ def plot_roc(hit_rate, fa_rate, hit_rate_wc=None, fa_rate_wc=None, as_html=False
             ),
         )
 
-    fig.update_layout(showlegend=True if hit_rate_wc else False)
+    fig.update_layout(showlegend=has_wc)
     fig.update_xaxes(constrain="domain")
     fig.update_yaxes(scaleanchor="x")
 
@@ -247,7 +248,7 @@ def plot_dprime(d_prime, d_prime_wc=None, as_html=False):
     fig.add_hline(y=0.0, line_color="darkred", opacity=0.8)
     fig.update_xaxes(showticklabels=False)
 
-    if d_prime_wc:
+    if d_prime_wc is not None:
         fig.add_trace(
             go.Scatter(y=[d_prime_wc], marker={"symbol": "x", "size": 12, "color": "orange"}, name="d' (all)"),
         )
@@ -273,7 +274,7 @@ def plot_criterion(criterion, criterion_wc=None, as_html=False):
     fig.add_hline(y=0.0, line_color="grey", opacity=0.8, line_dash="dash")
     fig.update_xaxes(showticklabels=False)
 
-    if criterion_wc:
+    if criterion_wc is not None:
         fig.add_trace(
             go.Scatter(y=[criterion_wc], marker={"symbol": "x", "size": 12, "color": "orange"}, name="C (all)"),
         )
