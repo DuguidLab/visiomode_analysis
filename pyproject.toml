@@ -62,8 +62,12 @@ extra-dependencies = [
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/visiomode_analysis tests}"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
 [tool.coverage.run]
-source_pkgs = ["visiomode_analysis", "tests"]
+source_pkgs = ["visiomode_analysis"]
 branch = true
 parallel = true
 omit = [
@@ -72,7 +76,6 @@ omit = [
 
 [tool.coverage.paths]
 visiomode_analysis = ["src/visiomode_analysis", "*/visiomode-analysis/src/visiomode_analysis"]
-tests = ["tests", "*/visiomode-analysis/tests"]
 
 [tool.coverage.report]
 exclude_lines = [
