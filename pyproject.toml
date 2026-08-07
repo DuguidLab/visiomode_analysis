@@ -7,7 +7,7 @@ name = "visiomode-analysis"
 dynamic = ["version"]
 description = 'Analysis package for Visiomode sessions'
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = "MIT"
 keywords = []
 authors = [
