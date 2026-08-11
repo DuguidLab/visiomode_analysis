@@ -31,7 +31,7 @@ cd visiomode_analysis
 uv sync
 ```
 
-This creates a `.venv` with the package and its dependencies installed in editable mode.
+This creates a `.venv` with the package, its dependencies and the development tooling installed, with the package itself in editable mode.
 
 ## Usage
 
@@ -113,15 +113,32 @@ src/visiomode_analysis/
 
 ## Development
 
+Common dev tasks are wrapped in a `Makefile`; run `make` on its own to list them.
+
 ```bash
-# Run the full test suite with coverage
-hatch test --cover
+# Run the test suite
+make test
+
+# Run tests with coverage
+make test-cov
+
+# Run a single test file or test
+make test ARGS="tests/test_metrics.py"
+make test ARGS="tests/test_metrics.py::test_d_prime_afc_correction -v"
 
 # Type checking
-hatch run types:check
+make types
+
+# Everything CI checks: tests with coverage, then type check
+make check
+
+# Build the sdist and wheel
+make build
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the issue workflow, and [CHANGELOG.md](CHANGELOG.md) for release notes.
+Each target is a wrapper around the equivalent `uv run` command (`make test` is `uv run pytest`), you can just call uv directly if you so please.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute and raise issues. See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 
