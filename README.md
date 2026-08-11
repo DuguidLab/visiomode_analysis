@@ -4,10 +4,10 @@ Analysis library and CLI for behavioural session data recorded with [Visiomode](
 
 ## Features
 
-- **Session summaries** — quickly summarise session stats, including signal detection theory metrics.
-- **HTML reports** — standalone, self-contained session reports with embedded Plotly figures.
-- **GLM regressors** — event regressors (stimulus/response/reward windows) aligned to an external timestamp series, such as imaging frame timestamps or electrophysiology acquisition rates.
-- **Subject-level and cohort-level analysis** — combine per-session trial summaries into a single per-subject summary CSV, as well as group-level analysis across subjects.
+- **Session summaries:** quickly summarise session stats, including signal detection theory metrics.
+- **HTML reports:** standalone, self-contained session reports with embedded Plotly figures.
+- **GLM regressors:** event regressors (stimulus/response/reward windows) aligned to an external timestamp series, such as imaging frame timestamps or electrophysiology acquisition rates.
+- **Subject-level and cohort-level analysis:** combine per-session trial summaries into a single per-subject summary CSV, as well as group-level analysis across subjects.
 
 ## Installation
 
@@ -96,7 +96,7 @@ src/visiomode_analysis/
 │   └── regressor.py       # per-protocol GLM regressor construction
 ├── subject/               # collates per-session trials.csv files into a subject summary
 │   └── __init__.py
-├── group/                 # cohort-level aggregation across subjects (stub, unimplemented)
+├── group/                 # cohort-level aggregation across subjects (not implemented yet)
 │   └── __init__.py
 └── reports/                # Jinja2 templates for HTML session reports
     ├── __init__.py
@@ -108,14 +108,8 @@ src/visiomode_analysis/
 ## Development
 
 ```bash
-# Run the full test suite with coverage (matches CI)
+# Run the full test suite with coverage
 hatch test --cover
-
-# Run tests directly with pytest (faster iteration)
-.venv/bin/pytest
-
-# Run a single test file / test
-.venv/bin/pytest tests/test_metrics.py::test_d_prime_afc_correction -v
 
 # Type checking
 hatch run types:check
