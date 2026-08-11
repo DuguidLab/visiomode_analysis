@@ -170,3 +170,9 @@ cython_debug/
 scratch/
 scratch
 
+# AI agent instruction files (not tracked for now)
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.claude/CLAUDE.md
+
