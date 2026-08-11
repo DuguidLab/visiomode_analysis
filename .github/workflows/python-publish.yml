@@ -30,9 +30,29 @@ jobs:
 
       - name: Build release distributions
         run: |
-          # NOTE: put your own distribution build steps here.
           python -m pip install build
           python -m build
+
+      - name: Check distributions
+        run: |
+          python -m pip install twine
+          python -m twine check dist/*
+
+      # Install the built wheel in a clean venv and exercise it end to end. This
+      # catches packaging faults that the test suite cannot see, because the
+      # tests run against the source tree rather than the built distribution
+      # (e.g. package data missing from the wheel).
+      - name: Smoke test built wheel
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install dist/*.whl
+          /tmp/smoke/bin/visiomode-analysis --version
+          mkdir -p /tmp/smoke-out
+          /tmp/smoke/bin/visiomode-analysis session \
+            exploratory/test_data/example-gonogo-leverpush.json \
+            -o /tmp/smoke-out
+          test -n "$(find /tmp/smoke-out -name '*report-session.html' -print -quit)"
+          test -n "$(find /tmp/smoke-out -name '*trials.csv' -print -quit)"
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
@@ -51,7 +71,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dist
+          name: release-dists
           path: dist/
 
       - name: Create release
@@ -78,12 +98,7 @@ jobs:
     # For more information, see: https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment#deployment-protection-rules
     environment:
       name: pypi
-      # OPTIONAL: uncomment and update to include your PyPI project URL in the deployment status:
-      # url: https://pypi.org/p/YOURPROJECT
-      #
-      # ALTERNATIVE: if your GitHub Release name is the PyPI project version string
-      # ALTERNATIVE: exactly, uncomment the following line instead:
-      # url: https://pypi.org/project/YOURPROJECT/${{ github.event.release.name }}
+      url: https://pypi.org/p/visiomode-analysis
 
     steps:
       - name: Retrieve release distributions

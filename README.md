@@ -14,6 +14,12 @@ Analysis library and CLI for behavioural session data recorded with [Visiomode](
 Requires Python 3.11+.
 
 ```bash
+pip install visiomode-analysis
+```
+
+Or, to install the latest unreleased code from `main`:
+
+```bash
 pip install git+https://github.com/DuguidLab/visiomode_analysis.git
 ```
 
@@ -115,7 +121,7 @@ hatch test --cover
 hatch run types:check
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the issue workflow, and [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 
