@@ -46,9 +46,13 @@ path = ".venv"  # Use uv environment path
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/visiomode_analysis"]
+# The report templates match the *.html rule in .gitignore, which the build
+# backend honours. Listing them as artifacts forces them into the wheel.
+artifacts = ["src/visiomode_analysis/reports/templates/*.html"]
 
 [tool.hatch.build.targets.sdist]
-exclude = ["/.github", "/docs"]
+exclude = ["/.github", "/.claude", "/docs"]
+artifacts = ["src/visiomode_analysis/reports/templates/*.html"]
 
 [tool.hatch.version]
 path = "src/visiomode_analysis/__about__.py"

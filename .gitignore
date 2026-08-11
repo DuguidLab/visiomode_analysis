@@ -163,9 +163,13 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Ignore outputs 
+# Ignore outputs
 *.csv
 *.html
+
+# ...but the report templates are package data, not outputs. Without this the
+# build backend honours the *.html rule above and silently ships a broken wheel.
+!src/visiomode_analysis/reports/templates/*.html
 
 scratch/
 scratch
