@@ -7,7 +7,7 @@ name = "visiomode-analysis"
 dynamic = ["version"]
 description = 'Analysis package for Visiomode sessions'
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = "MIT"
 keywords = []
 authors = [
@@ -17,17 +17,20 @@ authors = [
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
+  "Click", 
   "pandas",
   "numpy",
-  "scipy"
+  "scipy",
+  "plotly",
+  "Jinja2",
 ]
 
 [project.urls]
@@ -35,8 +38,11 @@ Documentation = "https://github.com/DuguidLab/visiomode_analysis#readme"
 Issues = "https://github.com/DuguidLab/visiomode_analysis/issues"
 Source = "https://github.com/DuguidLab/visiomode_analysis"
 
+[project.scripts]
+visiomode-analysis = "visiomode_analysis:cli"
+
 [tool.hatch.envs.default]
-python = "3.9"
+path = ".venv"  # Use uv environment path
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/visiomode_analysis"]
@@ -54,8 +60,12 @@ extra-dependencies = [
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/visiomode_analysis tests}"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
 [tool.coverage.run]
-source_pkgs = ["visiomode_analysis", "tests"]
+source_pkgs = ["visiomode_analysis"]
 branch = true
 parallel = true
 omit = [
@@ -64,7 +74,6 @@ omit = [
 
 [tool.coverage.paths]
 visiomode_analysis = ["src/visiomode_analysis", "*/visiomode-analysis/src/visiomode_analysis"]
-tests = ["tests", "*/visiomode-analysis/tests"]
 
 [tool.coverage.report]
 exclude_lines = [
