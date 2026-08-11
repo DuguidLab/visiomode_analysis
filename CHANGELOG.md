@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Tooling** — the project is now managed entirely with [uv](https://docs.astral.sh/uv/);
+  Hatch is no longer used as a test/environment runner. Tests run with
+  `uv run pytest --cov`, type checks with `uv run mypy`, and builds with
+  `uv build`. Development dependencies moved into a `dev` dependency group in
+  `pyproject.toml` and are now captured in `uv.lock`. Hatchling remains the
+  build backend, so the built distributions are unchanged.
+- **Makefile** — common tasks are wrapped in `make` targets (`test`, `test-cov`,
+  `types`, `check`, `build`, `install`, `lock`, `clean`), which CI now calls
+  directly so local and CI invocations cannot drift apart.
+- **Versioning** — the version is now declared statically in `pyproject.toml`
+  and bumped with `uv version --bump <major|minor|patch>`;
+  `visiomode_analysis.__about__.__version__` reads it back from the installed
+  distribution metadata.
+
+### Fixed
+
+- The type-check command no longer fails to start. The Hatch `types` environment
+  inherited `path = ".venv"` from the default environment and tried to
+  `pip install` into the uv-managed venv, which has no `pip`. Type stubs for
+  pandas and scipy are now pinned as dev dependencies.
+
 ## [0.1.0] - 2026-08-11
 
 First public release.

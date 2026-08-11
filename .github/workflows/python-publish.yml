@@ -24,19 +24,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.x"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Build release distributions
-        run: |
-          python -m pip install build
-          python -m build
+        run: make build
 
       - name: Check distributions
-        run: |
-          python -m pip install twine
-          python -m twine check dist/*
+        run: uvx twine check dist/*
 
       # Install the built wheel in a clean venv and exercise it end to end. This
       # catches packaging faults that the test suite cannot see, because the
@@ -44,8 +42,8 @@ jobs:
       # (e.g. package data missing from the wheel).
       - name: Smoke test built wheel
         run: |
-          python -m venv /tmp/smoke
-          /tmp/smoke/bin/pip install dist/*.whl
+          uv venv /tmp/smoke
+          uv pip install --python /tmp/smoke/bin/python dist/*.whl
           /tmp/smoke/bin/visiomode-analysis --version
           mkdir -p /tmp/smoke-out
           /tmp/smoke/bin/visiomode-analysis session \
