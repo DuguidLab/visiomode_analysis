@@ -175,7 +175,7 @@
 
 <hr>
 
-{% if protocol != "targetonly"%}
+{% if not is_targetonly %}
 <div class="row mb-3">
     <h2 id="integrity">SDT metrics</h2>
 
@@ -226,7 +226,7 @@
         </div>
     </div>
 
-    {% if protocol != "targetonly"%}
+    {% if not is_targetonly %}
     <div class="col-md-12 mb-3">
         <div class="row mb-2">
             <h6>SDT timeseries</h6>
