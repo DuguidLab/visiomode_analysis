@@ -117,13 +117,99 @@ def test_generate_regressors_accepts_txt_timestamps(
     assert (tmp_path / "sub-MM229_exp-109hrb21d_ses-20220309_behaviour-gonogo_regressors.npz").exists()
 
 
+def test_generate_regressors_txt_output_has_expected_keys(
+    gonogo_session_json_path, gonogo_regressor_timestamps_txt_path, tmp_path
+):
+    trials_df = session.get_trials(gonogo_session_json_path)
+    metadata = session.get_metadata(gonogo_session_json_path)
+
+    out_path = session.generate_regressors(trials_df, metadata, gonogo_regressor_timestamps_txt_path, output_dir=str(tmp_path))
+
+    with np.load(out_path) as npz:
+        assert set(npz.files) == {
+            "regressors",
+            "labels",
+            "timestamps",
+            "trial_idx",
+            "session_start_time",
+            "behaviour_session",
+        }
+        assert str(npz["session_start_time"]) == metadata["session_start_time"]
+        assert str(npz["behaviour_session"]) == "example-gonogo-leverpush"
+        # TXT timestamps are still recalculated relative to behaviour start.
+        expected = session.get_trials(gonogo_session_json_path)["cue_onset"].dropna().head(3) + 0.2
+        np.testing.assert_allclose(npz["timestamps"], expected.to_numpy(), atol=1e-6)
+
+
+def test_generate_regressors_h5_uses_aligned_timestamps_as_is(gonogo_session_json_path, write_aligned_h5, tmp_path):
+    trials_df = session.get_trials(gonogo_session_json_path)
+    metadata = session.get_metadata(gonogo_session_json_path)
+    timestamps = (trials_df["cue_onset"].dropna().head(3) + 0.2).to_numpy()
+    h5_path = write_aligned_h5(tmp_path / "aligned.h5", timestamps=timestamps)
+
+    out_path = session.generate_regressors(trials_df, metadata, h5_path, output_dir=str(tmp_path))
+
+    with np.load(out_path) as npz:
+        np.testing.assert_array_equal(npz["timestamps"], timestamps)
+        assert npz["timestamps"].dtype == np.float64
+        assert str(npz["session_start_time"]) == metadata["session_start_time"]
+        assert str(npz["behaviour_session"]) == metadata["behaviour_session"]
+        assert npz["regressors"].shape[0] == len(timestamps)
+
+
+def test_generate_regressors_h5_accepts_equivalent_iso_spellings(gonogo_session_json_path, write_aligned_h5, tmp_path):
+    trials_df = session.get_trials(gonogo_session_json_path)
+    metadata = session.get_metadata(gonogo_session_json_path)
+    # Same instant, different ISO 8601 spelling (space separator instead of "T").
+    respelled = datetime.datetime.fromisoformat(metadata["session_start_time"]).isoformat(sep=" ")
+    assert respelled != metadata["session_start_time"]
+    h5_path = write_aligned_h5(tmp_path / "aligned.h5", session_start_time=respelled)
+
+    out_path = session.generate_regressors(trials_df, metadata, h5_path, output_dir=str(tmp_path))
+
+    assert out_path.endswith("_regressors.npz")
+
+
+def test_generate_regressors_h5_rejects_mismatched_session_start_time(
+    gonogo_session_json_path, write_aligned_h5, tmp_path
+):
+    trials_df = session.get_trials(gonogo_session_json_path)
+    metadata = session.get_metadata(gonogo_session_json_path)
+    h5_path = write_aligned_h5(tmp_path / "aligned.h5", session_start_time="2000-01-01T00:00:00")
+
+    with pytest.raises(ValueError, match="session_start_time mismatch"):
+        session.generate_regressors(trials_df, metadata, h5_path, output_dir=str(tmp_path))
+
+
+def test_generate_regressors_h5_rejects_missing_dataset(gonogo_session_json_path, write_aligned_h5, tmp_path):
+    trials_df = session.get_trials(gonogo_session_json_path)
+    metadata = session.get_metadata(gonogo_session_json_path)
+    h5_path = write_aligned_h5(tmp_path / "aligned.h5", include_dataset=False)
+
+    with pytest.raises(ValueError, match="timestamps_aligned"):
+        session.generate_regressors(trials_df, metadata, h5_path, output_dir=str(tmp_path))
+
+
+def test_generate_regressors_h5_rejects_missing_session_start_time_attr(gonogo_session_json_path, tmp_path):
+    import h5py
+
+    trials_df = session.get_trials(gonogo_session_json_path)
+    metadata = session.get_metadata(gonogo_session_json_path)
+    h5_path = tmp_path / "aligned.h5"
+    with h5py.File(h5_path, "w") as h5:
+        h5.create_dataset("timestamps_aligned", data=np.array([1.0, 2.0]))
+
+    with pytest.raises(ValueError, match="no session_start_time attribute"):
+        session.generate_regressors(trials_df, metadata, str(h5_path), output_dir=str(tmp_path))
+
+
 def test_generate_regressors_rejects_unsupported_timestamps_file_extension(gonogo_session_json_path, tmp_path):
     trials_df = session.get_trials(gonogo_session_json_path)
     metadata = session.get_metadata(gonogo_session_json_path)
     bad_path = tmp_path / "timestamps.xyz"
     bad_path.write_text("2022-01-01T00:00:01\n")
 
-    with pytest.raises(ValueError, match="CSV or TXT"):
+    with pytest.raises(ValueError, match="CSV, TXT or H5"):
         session.generate_regressors(trials_df, metadata, str(bad_path), output_dir=str(tmp_path))
 
 
