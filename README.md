@@ -37,7 +37,7 @@ This creates a `.venv` with the package, its dependencies and the development to
 
 ### CLI
 
-The package installs a `visiomode-analysis` command with four subcommands: `session`, `regressors`, `subject`, and `group`.
+The package installs a `visiomode-analysis` command with five subcommands: `session`, `regressors`, `session-start-time`, `subject`, and `group`.
 
 **Process a single session** — generates an HTML report and a trials CSV:
 
@@ -56,6 +56,14 @@ visiomode-analysis session path/to/session.json -o output/ --with-regressors --r
 
 ```bash
 visiomode-analysis regressors path/to/session.json -o output/ --regressor-timestamps frame_times.csv
+```
+
+`--regressor-timestamps` accepts a CSV or TXT of absolute ISO timestamps, or a mesoscopy H5 (from `mesoscopy align`) whose `/timestamps_aligned` dataset is already relative to behaviour start. For H5 input the dataset's `session_start_time` attribute must match the session's `timestamp`. The output `.npz` holds `regressors`, `labels`, `timestamps`, `trial_idx`, `session_start_time` and `behaviour_session`.
+
+**Print the session start time** (the JSON `timestamp` key), e.g. for aligning an imaging recording:
+
+```bash
+visiomode-analysis session-start-time path/to/session.json
 ```
 
 **Collate a subject's sessions** — combines every `*trials.csv` file in a directory (as produced by `session`) into one subject-level summary CSV:
