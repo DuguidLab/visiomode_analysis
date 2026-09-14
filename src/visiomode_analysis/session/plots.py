@@ -102,23 +102,37 @@ def plot_correction_pie(num_random, num_correction, as_html=False) -> str | go.F
     return fig
 
 
+def _rt_stats(rts) -> tuple[float, float, float]:
+    """Median and 25th/75th percentiles of a reaction-time array, NaN for an empty one."""
+    rts = np.asarray(rts, dtype=float)
+    if rts.size == 0:
+        return np.nan, np.nan, np.nan
+    return float(np.median(rts)), float(np.percentile(rts, 25)), float(np.percentile(rts, 75))
+
+
+def _rt_yaxis_range(stimulus_duration) -> list[float] | None:
+    """Fix the y-axis to [0, stimulus_duration] unless the duration is unknown (non-positive)."""
+    if stimulus_duration is None or stimulus_duration <= 0:
+        return None
+    return [0, stimulus_duration]
+
+
 def plot_rt_median(rts, stimulus_duration=4, as_html=False) -> str | go.Figure:
+    median, q25, q75 = _rt_stats(rts)
     fig = go.Figure(
         go.Scatter(
-            y=[np.median(rts)],
+            y=[median],
             error_y=dict(
                 type="data",
                 symmetric=False,
-                array=[np.percentile(rts, 75)],
-                arrayminus=[
-                    np.percentile(rts, 25),
-                ],
+                array=[q75],
+                arrayminus=[q25],
             ),
         ),
         layout=go.Layout(
             margin={"l": 20, "r": 20, "t": 20, "b": 20},
         ),
-        layout_yaxis_range=[0, stimulus_duration],
+        layout_yaxis_range=_rt_yaxis_range(stimulus_duration),
     )
     fig.update_xaxes(showticklabels=False)
 
@@ -128,22 +142,23 @@ def plot_rt_median(rts, stimulus_duration=4, as_html=False) -> str | go.Figure:
 
 
 def plot_rt_medians_from_dict(rt_dict: dict, stimulus_duration: int = 4, as_html=True) -> str | go.Figure:
+    stats = [_rt_stats(rt) for rt in rt_dict.values()]
     fig = go.Figure(
         go.Scatter(
-            y=[np.median(rt) for rt in rt_dict.values()],
+            y=[median for median, _, _ in stats],
             x=[key for key in rt_dict.keys()],
             error_y=dict(
                 type="data",
                 symmetric=False,
-                array=[np.percentile(rt, 75) for rt in rt_dict.values()],
-                arrayminus=[np.percentile(rt, 25) for rt in rt_dict.values()],
+                array=[q75 for _, _, q75 in stats],
+                arrayminus=[q25 for _, q25, _ in stats],
             ),
             mode="markers",
         ),
         layout=go.Layout(
             margin={"l": 20, "r": 20, "t": 20, "b": 20},
         ),
-        layout_yaxis_range=[0, stimulus_duration],
+        layout_yaxis_range=_rt_yaxis_range(stimulus_duration),
     )
 
     if as_html:

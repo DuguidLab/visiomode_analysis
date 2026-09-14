@@ -35,6 +35,7 @@ from jinja2 import PackageLoader
 from jinja2 import select_autoescape
 
 from collections.abc import Iterator
+from typing import Any
 
 from visiomode_analysis.session import metrics, plots
 import visiomode_analysis.session.regressor as rgr
@@ -46,6 +47,14 @@ HIT = "hit"
 MISS = "miss"
 FALSE_ALARM = "false_alarm"
 CORRECT_REJECTION = "correct_rejection"
+
+# Protocol identifiers that describe a target-only task (a single target stimulus, no distractor).
+# "singletarget" is the name older Visiomode versions used for what is now "targetonly".
+TARGETONLY_PROTOCOLS = ("targetonly", "singletarget")
+
+# Older Visiomode versions wrote SDT-style labels as the trial outcome; map them to the current
+# outcome vocabulary so downstream logic only has to deal with one set of labels.
+LEGACY_OUTCOME_LABELS = {"hit": "correct", "false_alarm": "incorrect", "miss": "no_response"}
 
 
 env = Environment(loader=PackageLoader("visiomode_analysis.reports", "templates"), autoescape=select_autoescape())
@@ -152,6 +161,11 @@ def preprocess_session(
         generate_regressors(trials_df, meta, regressor_timestamps, output_dir=output_dir)
 
     return output_dir
+
+
+def is_targetonly(protocol: str | None) -> bool:
+    """Whether a protocol identifier refers to a target-only task (see `TARGETONLY_PROTOCOLS`)."""
+    return protocol in TARGETONLY_PROTOCOLS
 
 
 def get_metadata(path: str) -> dict:
@@ -262,8 +276,9 @@ def get_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd.Dat
 
     df = pd.DataFrame(session)
 
-    # Convert legacy outcomes if they're still about
-    df["outcome"] = df["outcome"].replace({"hit": "correct", "false_alarm": "incorrect", "miss": "no_response"})
+    # Legacy outcomes are already normalised in `_flatten_trials`; repeat here so a DataFrame
+    # built any other way is treated the same.
+    df["outcome"] = df["outcome"].replace(LEGACY_OUTCOME_LABELS)
 
     if to_csv:
         out_path = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date')).replace('-', '')}_behaviour-{metadata.get('protocol')}_trials.csv"
@@ -543,6 +558,7 @@ def generate_report(path: str, output_dir: str = ".") -> str:
         "duration": metadata.get("duration"),
         "trials_num": session_summary.get("total"),
         "protocol": metadata.get("protocol"),
+        "is_targetonly": is_targetonly(metadata.get("protocol")),
         "response_device": metadata.get("response_device"),
         "reward_profile": metadata.get("reward_profile"),
         "iti": metadata.get("iti"),
@@ -572,7 +588,7 @@ def generate_report(path: str, output_dir: str = ".") -> str:
             stimulus_duration=metadata.get("stimulus_duration", 4000) / 1000,
             as_html=True,
         )
-        if metadata.get("protocol") == "targetonly"
+        if is_targetonly(metadata.get("protocol"))
         else plots.plot_rt_medians_from_dict(
             {
                 "all": get_rts(path=path, include_corrections=False),
@@ -587,7 +603,7 @@ def generate_report(path: str, output_dir: str = ".") -> str:
             stimulus_duration=metadata.get("stimulus_duration", 4000) / 1000,
             as_html=True,
         )
-        if metadata.get("protocol") == "targetonly"
+        if is_targetonly(metadata.get("protocol"))
         else plots.plot_rt_medians_from_dict(
             {
                 "all": get_rts(path=path, include_corrections=True),
@@ -646,10 +662,21 @@ def generate_report(path: str, output_dir: str = ".") -> str:
     return str(out_path)
 
 
+def _normalise_legacy_outcome(trial: Any) -> Any:
+    """Return a copy of a raw trial with any legacy outcome label mapped to the current vocabulary.
+
+    Done up front so the stimulus reconstruction and SDT inference in `_flatten_trials` see the same
+    labels regardless of which Visiomode version wrote the session.
+    """
+    return {**trial, "outcome": LEGACY_OUTCOME_LABELS.get(trial["outcome"], trial["outcome"])}
+
+
 def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
     session_start_time = datetime.datetime.fromisoformat(metadata.get("session_start_time", ""))
 
     for trial in session.get("trials", []):
+        trial = _normalise_legacy_outcome(trial)
+
         start_time = (datetime.datetime.fromisoformat(trial["timestamp"]) - session_start_time).total_seconds()
 
         stimulus_duration = metadata.get("stimulus_duration", -1) / 1000
@@ -712,7 +739,7 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
                             if key.startswith("distractor_")
                         },
                     }
-            elif metadata.get("protocol") == "targetonly":
+            elif is_targetonly(metadata.get("protocol")):
                 if (trial.get("response") and (trial.get("outcome") == "correct")) or (
                     trial.get("outcome") == "no_response"
                 ):
@@ -731,7 +758,7 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
         sdt_type = None
         if trial.get("sdt_type"):
             sdt_type = trial.get("sdt_type")
-        elif metadata.get("protocol") == "gonogo" or metadata.get("protocol") == "targetonly":
+        elif metadata.get("protocol") == "gonogo" or is_targetonly(metadata.get("protocol")):
             if trial.get("response") and trial.get("outcome") == "correct":
                 sdt_type = HIT
             elif trial.get("response") and trial.get("outcome") == "incorrect":

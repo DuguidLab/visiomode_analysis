@@ -1,5 +1,6 @@
 import datetime
 import json
+import pathlib
 import shutil
 
 import numpy as np
@@ -77,6 +78,37 @@ def test_summary_computes_consistent_trial_counts(gonogo_session_json_path):
     # Rates are Hautus-corrected proportions, so they're always strictly between 0 and 1.
     assert 0.0 < result["hit_rate"] < 1.0
     assert 0.0 < result["fa_rate"] < 1.0
+
+
+def test_summary_classifies_every_trial_of_an_all_miss_legacy_singletarget_session(
+    write_legacy_singletarget_json, tmp_path
+):
+    path = write_legacy_singletarget_json(tmp_path, num_trials=7)
+
+    result = session.summary(path)
+
+    assert result["protocol"] == "singletarget"
+    assert result["total"] == 7
+    assert result["cued"] == 7
+    assert result["misses"] == 7
+    assert result["hits"] == result["false_alarms"] == result["correct_rejections"] == 0
+    assert np.isnan(result["rt"])
+    assert np.isnan(result["rt_iqr"])
+
+
+def test_generate_report_succeeds_for_an_all_miss_legacy_singletarget_session(
+    write_legacy_singletarget_json, tmp_path
+):
+    # Regression: this used to raise IndexError from np.percentile on the empty RT array.
+    path = write_legacy_singletarget_json(tmp_path)
+
+    report_path = session.generate_report(path, output_dir=str(tmp_path))
+
+    assert report_path.endswith("_behaviour-singletarget_report-session.html")
+    html = pathlib.Path(report_path).read_text(encoding="utf-8")
+    # Target-only sessions have no distractor, so the SDT-only sections are omitted.
+    assert "SDT metrics" not in html
+    assert "SDT timeseries" not in html
 
 
 def test_summary_reports_nan_iqr_when_no_trial_has_a_response(tmp_path):

@@ -74,6 +74,41 @@ def test_plot_rt_medians_from_dict_preserves_key_order_and_per_key_stats():
     assert fig.layout.yaxis.range == pytest.approx((0, 4))
 
 
+def test_plot_rt_median_handles_no_reaction_times():
+    # A session in which no trial had a response has no RTs at all; np.percentile raises on an
+    # empty array, so the plot must degrade to NaN markers rather than blow up report generation.
+    fig = plots.plot_rt_median([], stimulus_duration=5)
+    scatter = fig.data[0]
+
+    assert np.isnan(scatter.y[0])
+    assert np.isnan(scatter.error_y.array[0])
+    assert np.isnan(scatter.error_y.arrayminus[0])
+    _assert_embeddable_html(plots.plot_rt_median([], stimulus_duration=5, as_html=True))
+
+
+def test_plot_rt_medians_from_dict_handles_empty_entries():
+    rt_dict = {"all": [0.2, 0.6, 1.0], "hits": [], "false_alarms": []}
+
+    fig = plots.plot_rt_medians_from_dict(rt_dict, stimulus_duration=4, as_html=False)
+    scatter = fig.data[0]
+
+    assert list(scatter.x) == ["all", "hits", "false_alarms"]
+    assert scatter.y[0] == pytest.approx(np.median(rt_dict["all"]))
+    assert np.isnan(scatter.y[1]) and np.isnan(scatter.y[2])
+    assert np.isnan(scatter.error_y.array[1]) and np.isnan(scatter.error_y.arrayminus[2])
+
+
+@pytest.mark.parametrize("stimulus_duration", [-0.001, 0, None])
+def test_rt_plots_leave_yaxis_unbounded_when_stimulus_duration_is_unknown(stimulus_duration):
+    # Legacy sessions without a `spec` report stimulus_duration as -1 ms; a [0, -0.001] axis range
+    # would render an empty plot, so fall back to plotly's auto-range instead.
+    fig = plots.plot_rt_median([0.2, 0.4], stimulus_duration=stimulus_duration)
+    fig_dict = plots.plot_rt_medians_from_dict({"all": [0.2, 0.4]}, stimulus_duration=stimulus_duration, as_html=False)
+
+    assert fig.layout.yaxis.range is None
+    assert fig_dict.layout.yaxis.range is None
+
+
 # -- plot_single_yvalue: the y-axis range clamps asymmetrically when the value falls outside [ymin, ymax]. --
 
 
