@@ -26,6 +26,17 @@ def test_session_cmd_writes_trials_csv_and_report(runner, gonogo_session_json_pa
     assert any(name.endswith("_report-session.html") for name in written)
 
 
+def test_session_cmd_handles_an_all_miss_legacy_singletarget_session(runner, write_legacy_singletarget_json, tmp_path):
+    path = write_legacy_singletarget_json(tmp_path)
+
+    result = runner.invoke(session.session_cmd, [path, "-o", str(tmp_path)])
+
+    assert result.exit_code == 0, result.output
+    written = os.listdir(tmp_path)
+    assert any(name.endswith("_behaviour-singletarget_trials.csv") for name in written)
+    assert any(name.endswith("_behaviour-singletarget_report-session.html") for name in written)
+
+
 def test_session_cmd_no_report_skips_report_generation(runner, gonogo_session_json_path, tmp_path):
     result = runner.invoke(session.session_cmd, [gonogo_session_json_path, "-o", str(tmp_path), "--no-report"])
 

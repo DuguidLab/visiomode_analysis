@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import pathlib
 
@@ -104,6 +105,48 @@ def write_trials_csv():
         path = os.path.join(directory, filename)
         df.to_csv(path, index=False)
         return path
+
+    return _write
+
+
+@pytest.fixture
+def write_legacy_singletarget_json():
+    """Factory fixture that writes a session JSON in the shape older Visiomode versions produced
+    for the "singletarget" protocol (now "targetonly"): no `spec`, no per-trial `stimulus` or
+    `response` objects, and SDT-style outcome labels ("miss") instead of "no_response". Every
+    trial is a miss, so the session has no reaction times at all."""
+
+    def _write(directory, num_trials=5, filename="sub-A1_exp-expX_ses-20210429_optoevents.json"):
+        start = datetime.datetime(2021, 4, 29, 16, 16, 33)
+        trials = [
+            {
+                "outcome": "miss",
+                "iti": 10.0,
+                "response_time": -1,
+                "duration": -1,
+                "pos_x": -1,
+                "pos_y": -1,
+                "dist_x": -1,
+                "dist_y": -1,
+                "timestamp": (start + datetime.timedelta(seconds=2 + 14 * i)).isoformat(),
+                "correction": False,
+            }
+            for i in range(num_trials)
+        ]
+        data = {
+            "animal_id": "A1",
+            "experiment": "expX",
+            "duration": 20.0,
+            "protocol": "singletarget",
+            "complete": True,
+            "timestamp": start.isoformat(),
+            "notes": "",
+            "device": "rig-1",
+            "trials": trials,
+        }
+        path = pathlib.Path(directory) / filename
+        path.write_text(json.dumps(data))
+        return str(path)
 
     return _write
 

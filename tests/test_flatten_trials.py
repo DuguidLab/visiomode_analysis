@@ -133,6 +133,38 @@ def test_legacy_targetonly_unmatched_response_outcome_combo_yields_no_stimulus(f
     assert np.isnan(trial["cue_onset"])
 
 
+def test_legacy_singletarget_is_treated_as_targetonly(flatten_trial):
+    # "singletarget" is the pre-rename spelling of "targetonly": a legacy trial under it should take
+    # the target-only path for both stimulus reconstruction and SDT classification.
+    trial = flatten_trial(
+        {**BASE_TRIAL, "response": None, "outcome": "no_response"},
+        metadata_overrides={"protocol": "singletarget"},
+    )
+
+    assert trial["stim_id"] == "movinggrating"
+    assert trial["sdt_type"] == "miss"
+
+
+def test_legacy_outcome_labels_are_normalised_before_sdt_inference(flatten_trial):
+    # Older sessions label outcomes with SDT terms ("hit"/"false_alarm"/"miss"). They must be
+    # mapped to correct/incorrect/no_response *inside* the flattening step, otherwise the
+    # inference branches (which only know the current vocabulary) leave sdt_type unset.
+    miss = flatten_trial(
+        {**BASE_TRIAL, "response": None, "outcome": "miss"},
+        metadata_overrides={"protocol": "targetonly"},
+    )
+    hit = flatten_trial(
+        {**BASE_TRIAL, "response": {"name": "touch", "timestamp": "2022-01-01T00:00:02"}, "outcome": "hit"},
+        metadata_overrides={"protocol": "targetonly"},
+    )
+
+    assert miss["outcome"] == "no_response"
+    assert miss["sdt_type"] == "miss"
+    assert miss["stim_id"] == "movinggrating"
+    assert hit["outcome"] == "correct"
+    assert hit["sdt_type"] == "hit"
+
+
 def test_legacy_other_protocol_uses_raw_stimuli_dict_unchanged(flatten_trial):
     trial = flatten_trial({**BASE_TRIAL, "response": None}, metadata_overrides={"protocol": "afc2"})
 
