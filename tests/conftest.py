@@ -2,6 +2,7 @@ import datetime
 import os
 import pathlib
 
+import h5py
 import numpy as np
 import pandas as pd
 import pytest
@@ -46,6 +47,34 @@ def gonogo_regressor_timestamps_txt_path(tmp_path, gonogo_session_json_path) -> 
     path = tmp_path / "regressor_timestamps.txt"
     path.write_text("\n".join(timestamps) + "\n")
     return str(path)
+
+
+@pytest.fixture
+def write_aligned_h5(gonogo_session_json_path):
+    """Factory fixture that writes a synthetic mesoscopy-style H5 following the alignment contract:
+    a float64 `/timestamps_aligned` dataset (seconds from behaviour start) with `session_start_time`,
+    `behaviour_session` and `offset_s` attributes. Defaults to timestamps that land inside real trials
+    of `gonogo_session_json_path`."""
+
+    def _write(path, timestamps=None, session_start_time=None, behaviour_session=None, include_dataset=True):
+        metadata = session.get_metadata(gonogo_session_json_path)
+        if timestamps is None:
+            trials = session.get_trials(gonogo_session_json_path)
+            timestamps = (trials["cue_onset"].dropna().head(3) + 0.2).to_numpy(dtype=np.float64)
+        if session_start_time is None:
+            session_start_time = metadata["session_start_time"]
+        if behaviour_session is None:
+            behaviour_session = metadata["behaviour_session"]
+
+        with h5py.File(path, "w") as h5:
+            if include_dataset:
+                dataset = h5.create_dataset("timestamps_aligned", data=np.asarray(timestamps, dtype=np.float64))
+                dataset.attrs["session_start_time"] = session_start_time
+                dataset.attrs["behaviour_session"] = behaviour_session
+                dataset.attrs["offset_s"] = float(timestamps[0])
+        return str(path)
+
+    return _write
 
 
 @pytest.fixture

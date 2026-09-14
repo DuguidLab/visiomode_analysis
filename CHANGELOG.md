@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Mesoscopy H5 input for regressors** — `--regressor-timestamps` (on both
+  `regressors` and `session --with-regressors`) now accepts an `.h5` file written
+  by `mesoscopy align`. Its `/timestamps_aligned` dataset is used directly as the
+  regressor timestamps; a missing dataset or a `session_start_time` attribute that
+  disagrees with the behaviour JSON raises. CSV/TXT input is unchanged. `h5py` is
+  a new runtime dependency.
+- **Regressor NPZ keys** — the `.npz` now also stores `session_start_time` (the
+  JSON `timestamp`) and `behaviour_session` (the JSON filename stem) for every
+  input type, so `mesoscopy process regression` can verify provenance.
+- **`session-start-time` command** — prints the behaviour session's `timestamp`
+  and nothing else.
+
 ### Changed
 
 - **Tooling** — the project is now managed entirely with [uv](https://docs.astral.sh/uv/);

@@ -24,6 +24,7 @@ import os
 import json
 import click
 import datetime
+import h5py
 import pandas as pd
 import numpy as np
 import numpy.typing as npt
@@ -77,7 +78,7 @@ env = Environment(loader=PackageLoader("visiomode_analysis.reports", "templates"
 @click.option(
     "--regressor-timestamps",
     type=click.Path(exists=True, dir_okay=False),
-    help="Path to a CSV file containing timestamps for regressor generation.",
+    help="Path to a CSV/TXT file of ISO timestamps, or a mesoscopy H5 with /timestamps_aligned, for regressor generation.",
 )
 def session_cmd(**kwargs):
     """Generate a session report and extract trials from a Visiomode JSON file."""
@@ -101,7 +102,7 @@ def session_cmd(**kwargs):
     "--regressor-timestamps",
     type=click.Path(exists=True, dir_okay=False),
     required=True,
-    help="Path to a CSV file containing timestamps for regressor generation.",
+    help="Path to a CSV/TXT file of ISO timestamps, or a mesoscopy H5 with /timestamps_aligned, for regressor generation.",
 )
 def regressors_cmd(**kwargs):
     """Generate regressors for a session based on the protocol."""
@@ -109,6 +110,16 @@ def regressors_cmd(**kwargs):
     meta = get_metadata(kwargs["path"])
     generate_regressors(trials_df, meta, kwargs["regressor_timestamps"], output_dir=kwargs["output_dir"])
     click.echo(f"Regressors saved under {kwargs['output_dir']}")
+
+
+@click.command("session-start-time")
+@click.argument(
+    "path",
+    type=click.Path(exists=True, dir_okay=False),
+)
+def session_start_time_cmd(path: str):
+    """Print the behaviour session start time (the JSON `timestamp` key) and nothing else."""
+    click.echo(get_metadata(path)["session_start_time"])
 
 
 def preprocess_session(
@@ -125,7 +136,7 @@ def preprocess_session(
         output_dir (str, optional): Output directory for report and trials files. Defaults to ".".
         no_report (bool, optional): Whether to generate a session report. Defaults to False.
         with_regressors (bool, optional): Whether to generate regressors for the session. Defaults to False.
-        regressor_timestamps (str, optional): Path to a CSV file containing timestamps for regressor generation. Defaults to None.
+        regressor_timestamps (str, optional): Path to a CSV/TXT file of ISO timestamps, or a mesoscopy H5, for regressor generation. Defaults to None.
     Returns:
         str: Returns directory under which files were saved
     """
@@ -202,6 +213,7 @@ def get_metadata(path: str) -> dict:
         "animal_id": animal_id,
         "experiment": experiment,
         "session_date": session_date,
+        "behaviour_session": Path(path).stem,
         "environment": environment,
         "protocol": protocol,
         "version": version,
@@ -431,38 +443,50 @@ def generate_regressors(
 ) -> str:
     """Generate regressors for the session based on the protocol.
 
-    Timestamps are recalculated to align to the start of the behaviour session, based on the session start time in the metadata.
+    CSV/TXT inputs hold absolute ISO timestamps, which are recalculated relative to the session start time in the
+    metadata. H5 inputs (written by `mesoscopy align`) hold already-aligned timestamps in `/timestamps_aligned`,
+    which are used as-is after checking that the file's `session_start_time` attribute matches the session.
 
     Args:
         trials_df (pd.DataFrame): A DataFrame containing trial data with columns for trial type,
             start time, and stop time.
         metadata (dict): A dictionary containing session metadata.
-        regressor_timestamps_path (str): Path to a CSV or TXT file containing timestamps for regressor generation. Typically corresponds to the timestamps of an imaging session or other continuous recording and should be in ISO format.
+        regressor_timestamps_path (str): Path to a CSV or TXT file of ISO timestamps, or a mesoscopy H5 file with a
+            `/timestamps_aligned` dataset. Typically corresponds to the frame times of an imaging session or other
+            continuous recording.
         output_dir (str, optional): Output directory for saving regressors. Defaults to ".".
 
     Returns:
         str: Path to the generated regressors file.
 
     Raises:
+        ValueError: If the timestamps file has an unsupported extension, or (for H5) the `/timestamps_aligned`
+            dataset is missing or its `session_start_time` attribute does not match the session.
         NotImplementedError: If the protocol specified in the metadata is not supported for regressor generation.
 
     Note:
-        The output regressors are saved as a .npz file which contains the regressors array, labels, and recalculated timestamps.
+        The output regressors are saved as a .npz file containing `regressors`, `labels`, `timestamps` (aligned to
+        behaviour start), `trial_idx`, `session_start_time` and `behaviour_session`.
     """
-
-    if regressor_timestamps_path.endswith(".csv"):
-        source_timestamps = pd.read_csv(regressor_timestamps_path).to_numpy().flatten()
-    elif regressor_timestamps_path.endswith(".txt"):
-        source_timestamps = np.loadtxt(regressor_timestamps_path, dtype=str)
-    else:
-        raise ValueError("Regressor timestamps file must be in CSV or TXT format.")
     session_start_time = datetime.datetime.fromisoformat(metadata.get("session_start_time", ""))
 
-    # recalculate timestamps to align to behaviour
-    timestamps = [
-        (datetime.datetime.fromisoformat(timestamp) - session_start_time).total_seconds()
-        for timestamp in source_timestamps
-    ]
+    if regressor_timestamps_path.endswith(".h5"):
+        timestamps = _read_aligned_timestamps(regressor_timestamps_path, session_start_time)
+    else:
+        if regressor_timestamps_path.endswith(".csv"):
+            source_timestamps = pd.read_csv(regressor_timestamps_path).to_numpy().flatten()
+        elif regressor_timestamps_path.endswith(".txt"):
+            source_timestamps = np.loadtxt(regressor_timestamps_path, dtype=str)
+        else:
+            raise ValueError("Regressor timestamps file must be in CSV, TXT or H5 format.")
+
+        # recalculate timestamps to align to behaviour
+        timestamps = np.array(
+            [
+                (datetime.datetime.fromisoformat(timestamp) - session_start_time).total_seconds()
+                for timestamp in source_timestamps
+            ]
+        )
 
     outpath = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date')).replace('-', '')}_behaviour-{metadata.get('protocol')}_regressors.npz"
 
@@ -472,13 +496,37 @@ def generate_regressors(
             outpath,
             regressors=regressors,
             labels=np.array(list(labels.values())),
-            timestamps=np.array(timestamps),
+            timestamps=timestamps,
             trial_idx=trial_idx,
+            session_start_time=metadata.get("session_start_time", ""),
+            behaviour_session=metadata.get("behaviour_session", ""),
         )
     else:
         raise NotImplementedError(f"Regressor generation not implemented for protocol {metadata.get('protocol')}.")
 
     return outpath
+
+
+ALIGNED_TIMESTAMPS_DATASET = "timestamps_aligned"
+
+
+def _read_aligned_timestamps(path: str, session_start_time: datetime.datetime) -> npt.NDArray[np.float64]:
+    """Read `/timestamps_aligned` from a mesoscopy H5, checking its `session_start_time` attribute against the session."""
+    with h5py.File(path, "r") as h5:
+        if ALIGNED_TIMESTAMPS_DATASET not in h5:
+            raise ValueError(f"Dataset /{ALIGNED_TIMESTAMPS_DATASET} not found in {path}.")
+        dataset = h5[ALIGNED_TIMESTAMPS_DATASET]
+        h5_start_time = dataset.attrs.get("session_start_time")
+        if h5_start_time is None:
+            raise ValueError(f"/{ALIGNED_TIMESTAMPS_DATASET} in {path} has no session_start_time attribute.")
+        if isinstance(h5_start_time, bytes):
+            h5_start_time = h5_start_time.decode()
+        if datetime.datetime.fromisoformat(str(h5_start_time)) != session_start_time:
+            raise ValueError(
+                f"session_start_time mismatch: {path} has {h5_start_time}, behaviour session is "
+                f"{session_start_time.isoformat()}."
+            )
+        return np.asarray(dataset[()], dtype=np.float64)
 
 
 def generate_report(path: str, output_dir: str = ".") -> str:

@@ -91,11 +91,44 @@ def test_regressors_cmd_writes_regressors_file(
     assert any(name.endswith("_regressors.npz") for name in os.listdir(tmp_path))
 
 
+def test_regressors_cmd_accepts_h5_timestamps(runner, gonogo_session_json_path, write_aligned_h5, tmp_path):
+    h5_path = write_aligned_h5(tmp_path / "aligned.h5")
+
+    result = runner.invoke(
+        session.regressors_cmd, [gonogo_session_json_path, "-o", str(tmp_path), "--regressor-timestamps", h5_path]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert any(name.endswith("_regressors.npz") for name in os.listdir(tmp_path))
+
+
+def test_session_cmd_with_regressors_accepts_h5_timestamps(runner, gonogo_session_json_path, write_aligned_h5, tmp_path):
+    h5_path = write_aligned_h5(tmp_path / "aligned.h5")
+
+    result = runner.invoke(
+        session.session_cmd,
+        [gonogo_session_json_path, "-o", str(tmp_path), "--no-report", "--with-regressors", "--regressor-timestamps", h5_path],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert any(name.endswith("_regressors.npz") for name in os.listdir(tmp_path))
+
+
 def test_regressors_cmd_requires_regressor_timestamps_option(runner, gonogo_session_json_path):
     result = runner.invoke(session.regressors_cmd, [gonogo_session_json_path])
 
     assert result.exit_code == 2
     assert "regressor-timestamps" in result.output.lower()
+
+
+# -- `visiomode-analysis session-start-time` --
+
+
+def test_session_start_time_cmd_prints_only_the_timestamp(runner, gonogo_session_json_path):
+    result = runner.invoke(session.session_start_time_cmd, [gonogo_session_json_path])
+
+    assert result.exit_code == 0, result.output
+    assert result.output == session.get_metadata(gonogo_session_json_path)["session_start_time"] + "\n"
 
 
 # -- `visiomode-analysis subject` --
@@ -142,7 +175,7 @@ def test_cli_lists_all_subcommands(runner):
     result = runner.invoke(cli, ["--help"])
 
     assert result.exit_code == 0
-    for command_name in ("session", "regressors", "subject", "group"):
+    for command_name in ("session", "regressors", "session-start-time", "subject", "group"):
         assert command_name in result.output
 
 

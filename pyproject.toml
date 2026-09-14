@@ -31,6 +31,7 @@ dependencies = [
   "scipy",
   "plotly",
   "Jinja2",
+  "h5py",
 ]
 
 [project.urls]
@@ -64,11 +65,11 @@ artifacts = ["src/visiomode_analysis/reports/templates/*.html"]
 [tool.mypy]
 files = ["src/visiomode_analysis", "tests"]
 
-# Plotly ships no type information, so every import from it is an error under
-# the default settings. Stubs for the remaining third-party deps are pinned in
-# the dev dependency group instead of being fetched on the fly.
+# Plotly and h5py ship no type information, so every import from them is an
+# error under the default settings. Stubs for the remaining third-party deps are
+# pinned in the dev dependency group instead of being fetched on the fly.
 [[tool.mypy.overrides]]
-module = ["plotly.*"]
+module = ["plotly.*", "h5py.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
