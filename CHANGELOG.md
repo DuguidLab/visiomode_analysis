@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sessions with no responses no longer crash report generation.** The reaction
+  time plots called `np.percentile` on an empty array (IndexError) when no trial
+  had a response; they now render NaN markers instead. When the stimulus duration
+  is unknown (legacy sessions without a `spec` report it as -1) the RT y-axis is
+  left to auto-range rather than being fixed to `[0, -0.001]`.
+- **Legacy `singletarget` sessions are treated as `targetonly`.** Older Visiomode
+  versions named the target-only protocol `singletarget`; those sessions fell
+  through to the Go/NoGo and 2AFC code paths, so their trials got no stimulus or
+  SDT classification and the report tried to plot hit/false-alarm RTs that cannot
+  exist. `session.is_targetonly()` / `session.TARGETONLY_PROTOCOLS` centralise the
+  alias.
+- **Legacy outcome labels are normalised before SDT inference.** `hit` /
+  `false_alarm` / `miss` outcomes written by older Visiomode versions were only
+  remapped to `correct` / `incorrect` / `no_response` after flattening, so the
+  per-trial stimulus reconstruction and `sdt_type` inference never matched them
+  and left every such trial unclassified. The remap now happens per trial inside
+  `_flatten_trials()`.
+
 ## [0.2.0] - 2026-09-14
 
 ### Added
@@ -41,23 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Sessions with no responses no longer crash report generation.** The reaction
-  time plots called `np.percentile` on an empty array (IndexError) when no trial
-  had a response; they now render NaN markers instead. When the stimulus duration
-  is unknown (legacy sessions without a `spec` report it as -1) the RT y-axis is
-  left to auto-range rather than being fixed to `[0, -0.001]`.
-- **Legacy `singletarget` sessions are treated as `targetonly`.** Older Visiomode
-  versions named the target-only protocol `singletarget`; those sessions fell
-  through to the Go/NoGo and 2AFC code paths, so their trials got no stimulus or
-  SDT classification and the report tried to plot hit/false-alarm RTs that cannot
-  exist. `session.is_targetonly()` / `session.TARGETONLY_PROTOCOLS` centralise the
-  alias.
-- **Legacy outcome labels are normalised before SDT inference.** `hit` /
-  `false_alarm` / `miss` outcomes written by older Visiomode versions were only
-  remapped to `correct` / `incorrect` / `no_response` after flattening, so the
-  per-trial stimulus reconstruction and `sdt_type` inference never matched them
-  and left every such trial unclassified. The remap now happens per trial inside
-  `_flatten_trials()`.
 - The type-check command no longer fails to start. The Hatch `types` environment
   inherited `path = ".venv"` from the default environment and tried to
   `pip install` into the uv-managed venv, which has no `pip`. Type stubs for
