@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Interdecile range is now reported in subject summary metrics ()`visiomode-analysis subject`).
+- Interdecile range is now reported in subject summary metrics (`visiomode-analysis subject`).
 
 ### Fixed
 
