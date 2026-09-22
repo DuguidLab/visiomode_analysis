@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Interdecile range is now reported in subject summary metrics ()`visiomode-analysis subject`).
+
 ### Fixed
 
 - **Sessions with no responses no longer crash report generation.** The reaction
