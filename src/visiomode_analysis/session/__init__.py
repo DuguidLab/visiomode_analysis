@@ -402,9 +402,28 @@ def summary(path: str) -> dict:
                 25,
             )
         )
+
+        # interdecile range (10th to 90th percentile)
+        rt_idr = float(
+            np.percentile(
+                df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"], 90
+            )
+            - np.percentile(
+                df[(df.response.notnull()) & (df.outcome != "precued") & (df.correction == False)]["response_time"], 10
+            )
+        )
+        rt_idr_wc = float(
+            np.percentile(df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"], 90)
+            - np.percentile(
+                df[(df.response.notnull()) & (df.outcome != "precued")]["response_time"],
+                10,
+            )
+        )
     except IndexError:
         rt_iqr = np.nan
         rt_iqr_wc = np.nan
+        rt_idr = np.nan
+        rt_idr_wc = np.nan
 
     return {
         "animal_id": metadata.get("animal_id"),
@@ -450,6 +469,8 @@ def summary(path: str) -> dict:
         "rt_false_alarms_wc": rt_false_alarms_wc,
         "rt_iqr": rt_iqr,
         "rt_iqr_wc": rt_iqr_wc,
+        "rt_idr": rt_idr,
+        "rt_idr_wc": rt_idr_wc,
     }
 
 
