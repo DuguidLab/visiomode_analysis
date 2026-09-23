@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Interdecile range is now reported in subject summary metrics (`visiomode-analysis subject`).
+
 ## [0.2.1] - 2026-09-15
 
 ### Fixed
@@ -20,8 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   versions named the target-only protocol `singletarget`; those sessions fell
   through to the Go/NoGo and 2AFC code paths, so their trials got no stimulus or
   SDT classification and the report tried to plot hit/false-alarm RTs that cannot
-  exist. `session.is_targetonly()` / `session.TARGETONLY_PROTOCOLS` centralise the
-  alias.
+  exist.
 - **Legacy outcome labels are normalised before SDT inference.** `hit` /
   `false_alarm` / `miss` outcomes written by older Visiomode versions were only
   remapped to `correct` / `incorrect` / `no_response` after flattening, so the
