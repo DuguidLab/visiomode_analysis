@@ -1,5 +1,6 @@
 import os
 
+import pandas as pd
 import pytest
 from click.testing import CliRunner
 
@@ -153,6 +154,29 @@ def test_subject_cmd_writes_summary_csv(runner, tmp_path, write_trials_csv):
     assert result.exit_code == 0, result.output
     assert f"Files saved under {tmp_path}" in result.output
     assert (tmp_path / "sub-A1_exp-expX_behaviour-summary.csv").exists()
+
+
+def test_subject_cmd_lists_excluded_sessions_by_default(runner, tmp_path, write_trials_csv):
+    write_trials_csv(tmp_path, "a_trials.csv", "A1", "2022-01-01", "gonogo", "expX")
+    write_trials_csv(tmp_path, "b_trials.csv.ignore", "A1", "2022-01-02", "gonogo", "expX")
+
+    result = runner.invoke(subject.subject_cmd, [str(tmp_path), "-o", str(tmp_path)])
+
+    assert result.exit_code == 0, result.output
+    written = pd.read_csv(tmp_path / "sub-A1_exp-expX_behaviour-summary.csv", index_col=0)
+    assert list(written["excluded"]) == [False, True]
+
+
+def test_subject_cmd_no_ignore_drops_excluded_sessions(runner, tmp_path, write_trials_csv):
+    write_trials_csv(tmp_path, "a_trials.csv", "A1", "2022-01-01", "gonogo", "expX")
+    write_trials_csv(tmp_path, "b_trials.csv.ignore", "A1", "2022-01-02", "gonogo", "expX")
+
+    result = runner.invoke(subject.subject_cmd, [str(tmp_path), "-o", str(tmp_path), "--no-ignore"])
+
+    assert result.exit_code == 0, result.output
+    written = pd.read_csv(tmp_path / "sub-A1_exp-expX_behaviour-summary.csv", index_col=0)
+    assert list(written["session_date"]) == ["2022-01-01"]
+    assert list(written["excluded"]) == [False]
 
 
 def test_subject_cmd_raises_for_a_directory_with_no_trials_csv(runner, tmp_path):
