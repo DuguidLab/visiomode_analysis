@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Interdecile range is now reported in subject summary metrics (`visiomode-analysis subject`).
+- **Interdecide range.** Interdecile range is now reported in addition to IQR in
+  subject summary metrics (`visiomode-analysis subject`).
+- **Excluded sessions in subject summaries.** Trials files marked with a suffix after
+  `.csv` (`.ignore`, `.ignored`, `.exclude`, `.excluded` or `.skip`, case-insensitive,
+  e.g. `..._trials.csv.ignore`) are listed in the subject summary with their metadata
+  but no metrics, and still count towards `session_id` and `task_session`. A new
+  `excluded` column flags them. `visiomode-analysis subject --no-ignore` drops them
+  altogether instead.
 
 ## [0.2.1] - 2026-09-15
 
