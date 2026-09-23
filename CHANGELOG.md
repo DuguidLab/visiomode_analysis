@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Interdecile range is now reported in subject summary metrics (`visiomode-analysis subject`).
 
+## [0.2.1] - 2026-09-15
+
 ### Fixed
 
 - **Sessions with no responses no longer crash report generation.** The reaction
@@ -110,6 +112,7 @@ First public release.
 - Test suite covering trial flattening, metrics, plots, regressors, session
   summaries, subject collation and the CLI, run against Python 3.11–3.13 in CI.
 
-[Unreleased]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/DuguidLab/visiomode_analysis/releases/tag/v0.1.0
