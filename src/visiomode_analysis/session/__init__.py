@@ -57,6 +57,10 @@ TARGETONLY_PROTOCOLS = ("targetonly", "singletarget")
 # outcome vocabulary so downstream logic only has to deal with one set of labels.
 LEGACY_OUTCOME_LABELS = {"hit": "correct", "false_alarm": "incorrect", "miss": "no_response"}
 
+# Newer Visiomode versions (0.5+) record a trial without a response (a miss or correct rejection) as a response with
+# this name, with the trial timeout as its response time. Older versions leave the response out instead.
+NO_RESPONSE_NAME = "none"
+
 # Companion file holding the duration (ms) of every lever push in a session, one row per push in trial order.
 LEVER_DURATIONS_SUFFIX = "_lever-durations.csv"
 LEVER_DURATION = "lever_duration"
@@ -397,6 +401,20 @@ def _lever_duration_summary(df: pd.DataFrame) -> dict[str, float]:
     return fields
 
 
+def _blank_none_responses(df: pd.DataFrame) -> pd.DataFrame:
+    """Blank out the response and response time of trials whose response is `NO_RESPONSE_NAME`.
+
+    `_flatten_trials` already does this for trials parsed from a JSON; this covers trials CSVs written by versions
+    before 0.4.1, which kept the "none" response and its timeout response time.
+    """
+    no_response = df["response"] == NO_RESPONSE_NAME
+    if not no_response.any():
+        return df
+    df = df.copy()
+    df.loc[no_response, ["response", "response_time"]] = np.nan
+    return df
+
+
 def get_rts(path: str, sdt_type=None, include_corrections=True) -> npt.NDArray:
     return _select_rts(get_trials(path=path), sdt_type=sdt_type, include_corrections=include_corrections)
 
@@ -427,7 +445,7 @@ def summary(path: str | pd.DataFrame, lever_durations: str | None = None) -> dic
         metadata = get_metadata(path)
         df = get_trials(path, lever_durations=lever_durations)
     else:
-        df = path if isinstance(path, pd.DataFrame) else pd.read_csv(path)
+        df = _blank_none_responses(path if isinstance(path, pd.DataFrame) else pd.read_csv(path))
         metadata = {
             "animal_id": df["animal_id"].iloc[0],
             "session_date": df["session_date"].iloc[0],
@@ -839,11 +857,23 @@ def _normalise_legacy_outcome(trial: Any) -> Any:
     return {**trial, "outcome": LEGACY_OUTCOME_LABELS.get(trial["outcome"], trial["outcome"])}
 
 
+def _normalise_no_response(trial: Any) -> Any:
+    """Return a copy of a raw trial with a `NO_RESPONSE_NAME` response rewritten the way older Visiomode versions
+    record no response: no response object and a response time of -1.
+
+    Done up front so the response, response time, touch position, stimulus reconstruction and SDT inference in
+    `_flatten_trials` all treat the trial as having no response, rather than counting the timeout as a reaction time.
+    """
+    if (trial.get("response") or {}).get("name") == NO_RESPONSE_NAME:
+        return {**trial, "response": None, "response_time": -1}
+    return trial
+
+
 def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
     session_start_time = datetime.datetime.fromisoformat(metadata.get("session_start_time", ""))
 
     for trial in session.get("trials", []):
-        trial = _normalise_legacy_outcome(trial)
+        trial = _normalise_no_response(_normalise_legacy_outcome(trial))
 
         start_time = (datetime.datetime.fromisoformat(trial["timestamp"]) - session_start_time).total_seconds()
 

@@ -512,3 +512,21 @@ def test_summary_reads_metadata_from_a_filtered_trials_dataframe(gonogo_session_
 
     assert result["animal_id"] == "MM229"
     assert result["protocol"] == "gonogo"
+
+
+def test_summary_ignores_none_responses_in_trials_csvs_written_by_older_versions(tmp_path, write_trials_csv):
+    # Trials CSVs written before 0.4.1 kept Visiomode's "none" response with the timeout as its response time.
+    rows = [
+        dict(outcome="correct", correction=False, sdt_type="hit", response_time=0.5, response="leverpush"),
+        dict(outcome="incorrect", correction=False, sdt_type="false_alarm", response_time=0.7, response="leverpush"),
+        dict(outcome="no_response", correction=False, sdt_type="miss", response_time=10.0, response="none"),
+        dict(outcome="correct", correction=False, sdt_type="correct_rejection", response_time=4.0, response="none"),
+    ]
+    csv_path = write_trials_csv(tmp_path, "trials.csv", "A1", "2022-01-01", "gonogo", "expX", rows=rows)
+
+    result = session.summary(csv_path)
+
+    assert result["rt"] == pytest.approx(0.6)
+    assert result["rt_wc"] == pytest.approx(0.6)
+    assert result["rt_iqr"] == pytest.approx(0.1)
+    assert result["misses"] == 1 and result["correct_rejections"] == 1
