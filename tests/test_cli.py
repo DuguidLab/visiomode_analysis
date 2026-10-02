@@ -38,6 +38,26 @@ def test_session_cmd_handles_an_all_miss_legacy_singletarget_session(runner, wri
     assert any(name.endswith("_behaviour-singletarget_report-session.html") for name in written)
 
 
+def test_session_cmd_writes_lever_durations_from_explicit_path(
+    runner, gonogo_session_with_lever_durations, tmp_path
+):
+    json_path, durations_path = gonogo_session_with_lever_durations
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    moved_durations_path = tmp_path / "elsewhere.csv"
+    os.rename(durations_path, moved_durations_path)
+
+    result = runner.invoke(
+        session.session_cmd,
+        [json_path, "-o", str(out_dir), "--no-report", "--lever-durations", str(moved_durations_path)],
+    )
+
+    assert result.exit_code == 0, result.output
+    (trials_csv,) = [name for name in os.listdir(out_dir) if name.endswith("_trials.csv")]
+    trials = pd.read_csv(out_dir / trials_csv)
+    assert trials["lever_duration"].notna().any()
+
+
 def test_session_cmd_no_report_skips_report_generation(runner, gonogo_session_json_path, tmp_path):
     result = runner.invoke(session.session_cmd, [gonogo_session_json_path, "-o", str(tmp_path), "--no-report"])
 
