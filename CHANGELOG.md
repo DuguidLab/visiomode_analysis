@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-02
+
 ### Added
 
 - **Lever push durations.** `visiomode-analysis session` picks up a sibling
@@ -16,10 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be matched (empty or unparseable, missing `push_id`/`duration` columns, non-numeric
   durations, `push_id` not running 0..n-1, or a push count that differs from the
   number of lever push trials) a warning is printed and the column is left empty; no
-  durations file means no column. Session and
-  subject summaries report the mean, median, SD and IQR of lever durations for all
-  pushes, cued pushes, hits, false alarms and precued trials, each with a `_wc`
-  variant, and the session report gains a median lever push duration plot.
+  durations file means no column. Session and subject summaries report the mean,
+  median, SD and IQR of lever durations for all pushes, cued pushes, hits, false
+  alarms and precued trials, each with a `_wc` variant, and the session report gains
+  a median lever push duration plot.
 - **Summaries and reports from an existing trials dataframe.** `session.summary()` now
   also accepts a trials dataframe from `session.get_trials()`, and
   `session.generate_report()` takes an optional `trials` dataframe, so a session is
@@ -146,7 +148,8 @@ First public release.
 - Test suite covering trial flattening, metrics, plots, regressors, session
   summaries, subject collation and the CLI, run against Python 3.11–3.13 in CI.
 
-[Unreleased]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.1.0...v0.2.0
