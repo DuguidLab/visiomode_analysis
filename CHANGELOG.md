@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-02
+
 ### Fixed
 
 - **Trials without a response in Visiomode 0.5+ sessions.** Newer Visiomode versions
@@ -162,7 +164,8 @@ First public release.
 - Test suite covering trial flattening, metrics, plots, regressors, session
   summaries, subject collation and the CLI, run against Python 3.11–3.13 in CI.
 
-[Unreleased]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/DuguidLab/visiomode_analysis/compare/v0.2.0...v0.2.1
