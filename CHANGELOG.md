@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pushes, cued pushes, hits, false alarms and precued trials, each with a `_wc`
   variant, and the session report gains a median lever push duration plot.
 
+### Fixed
+
+- **Reaction time IQR error bars.** The median reaction time plots in the session
+  report passed the 25th/75th percentiles to Plotly as error bar lengths, which
+  Plotly treats as offsets from the median, so bars spanned `median - q25` to
+  `median + q75`. They now span the IQR (`q25` to `q75`).
+
 ## [0.3.0] - 2026-09-23
 
 ### Added
