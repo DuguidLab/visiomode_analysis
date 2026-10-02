@@ -167,7 +167,7 @@ def preprocess_session(
     meta = get_metadata(path)
 
     if not no_report:
-        generate_report(path, output_dir=output_dir, lever_durations=lever_durations)
+        generate_report(path, output_dir=output_dir, trials=trials_df)
 
     if with_regressors:
         if not regressor_timestamps:
@@ -329,23 +329,40 @@ def _is_lever_push(df: pd.DataFrame) -> pd.Series:
 def _add_lever_durations(df: pd.DataFrame, lever_durations: str) -> pd.DataFrame:
     """Add a `lever_duration` (ms) column, matching the Nth push in `lever_durations` to the Nth lever push trial.
 
-    Non-push trials are NaN. If the number of pushes doesn't match the number of lever push trials, the matching
-    can't be trusted, so a warning is raised and the whole column is left NaN.
+    Non-push trials are NaN. If the durations can't be matched to the trials (see `_read_lever_durations`), a warning
+    is raised and the whole column is left NaN. Warning rather than raising keeps a bad durations file from breaking
+    callers that don't need durations (e.g. `regressors`).
     """
-    durations = pd.read_csv(lever_durations).sort_values("push_id")["duration"].to_numpy(dtype=float)
     is_push = _is_lever_push(df)
 
     df = df.copy()
     df[LEVER_DURATION] = np.nan
-    if len(durations) != is_push.sum():
-        warnings.warn(
-            f"{lever_durations} has {len(durations)} lever pushes but the session has {is_push.sum()} lever push "
-            f"trials (precued, hits and false alarms); leaving {LEVER_DURATION} empty.",
-            stacklevel=2,
-        )
-    else:
-        df.loc[is_push, LEVER_DURATION] = durations
+    try:
+        df.loc[is_push, LEVER_DURATION] = _read_lever_durations(lever_durations, num_push_trials=int(is_push.sum()))
+    except ValueError as e:
+        warnings.warn(f"Can't match {lever_durations} to trials: {e}; leaving {LEVER_DURATION} empty.", stacklevel=2)
     return df
+
+
+def _read_lever_durations(path: str, num_push_trials: int) -> npt.NDArray:
+    """Read lever push durations (ms) in push order, checking they can be matched to the session's lever push trials.
+
+    Raises:
+        ValueError: If the file is empty or malformed, lacks a `push_id` or `duration` column, has non-numeric
+            durations, `push_id` doesn't run 0..n-1 (gaps or duplicates), or the number of pushes doesn't match
+            `num_push_trials`.
+    """
+    pushes = pd.read_csv(path)  # pandas' EmptyDataError and ParserError are ValueErrors
+    missing_columns = {"push_id", "duration"} - set(pushes.columns)
+    if missing_columns:
+        raise ValueError(f"missing column(s) {', '.join(sorted(missing_columns))}")
+    if sorted(pushes["push_id"].tolist()) != list(range(len(pushes))):
+        raise ValueError("push_id does not run from 0 without gaps or duplicates")
+    if len(pushes) != num_push_trials:
+        raise ValueError(
+            f"{len(pushes)} lever pushes but {num_push_trials} lever push trials (precued, hits and false alarms)"
+        )
+    return pd.to_numeric(pushes.sort_values("push_id")["duration"]).to_numpy(dtype=float)  # ValueError if non-numeric
 
 
 def _lever_duration_subsets(df: pd.DataFrame, include_corrections: bool = True) -> dict[str, pd.Series]:
@@ -381,8 +398,11 @@ def _lever_duration_summary(df: pd.DataFrame) -> dict[str, float]:
 
 
 def get_rts(path: str, sdt_type=None, include_corrections=True) -> npt.NDArray:
-    trials = get_trials(path=path)
+    return _select_rts(get_trials(path=path), sdt_type=sdt_type, include_corrections=include_corrections)
 
+
+def _select_rts(trials: pd.DataFrame, sdt_type=None, include_corrections=True) -> npt.NDArray:
+    """Reaction times of the cued trials with a response, optionally of one SDT type only."""
     if not include_corrections:
         trials = trials[trials.correction == False]  # noqa: E712
 
@@ -392,28 +412,28 @@ def get_rts(path: str, sdt_type=None, include_corrections=True) -> npt.NDArray:
     return np.array(trials[(trials.response.notnull()) & (trials.cue_onset.notnull())].response_time.values)
 
 
-def summary(path: str, lever_durations: str | None = None) -> dict:
-    """Summarise session from a JSON or trials.csv file
+def summary(path: str | pd.DataFrame, lever_durations: str | None = None) -> dict:
+    """Summarise session from a JSON or trials.csv file, or from a trials dataframe built by `get_trials`
 
     Args:
-        path (str): Path to (preprocessed) trials.csv or raw JSON
+        path (str | pd.DataFrame): Path to (preprocessed) trials.csv or raw JSON, or a trials dataframe
         lever_durations (str, optional): Path to a lever push durations CSV, for a raw JSON only. Defaults to the
             sibling file found by `find_lever_durations`.
 
     Returns:
         dict: Summary dictionary. Lever duration fields are only included if the trials have a `lever_duration` column.
     """
-    if path.endswith(".json"):
+    if isinstance(path, str) and path.endswith(".json"):
         metadata = get_metadata(path)
         df = get_trials(path, lever_durations=lever_durations)
     else:
-        df = pd.read_csv(path)
+        df = path if isinstance(path, pd.DataFrame) else pd.read_csv(path)
         metadata = {
-            "animal_id": df["animal_id"][0],
-            "session_date": df["session_date"][0],
-            "protocol": df["protocol"][0],
-            "environment": df["environment"][0],
-            "experiment": df["experiment"][0],
+            "animal_id": df["animal_id"].iloc[0],
+            "session_date": df["session_date"].iloc[0],
+            "protocol": df["protocol"].iloc[0],
+            "environment": df["environment"].iloc[0],
+            "experiment": df["experiment"].iloc[0],
         }
 
     # Trial counts
@@ -661,12 +681,27 @@ def _read_aligned_timestamps(path: str, session_start_time: datetime.datetime) -
         return np.asarray(dataset[()], dtype=np.float64)
 
 
-def generate_report(path: str, output_dir: str = ".", lever_durations: str | None = None) -> str:
+def generate_report(
+    path: str, output_dir: str = ".", lever_durations: str | None = None, trials: pd.DataFrame | None = None
+) -> str:
+    """Render the session HTML report.
+
+    Args:
+        path (str): Path to Visiomode JSON file.
+        output_dir (str, optional): Output directory for the report. Defaults to ".".
+        lever_durations (str, optional): Path to a lever push durations CSV. Ignored if `trials` is given. Defaults to
+            the sibling file found by `find_lever_durations`.
+        trials (pd.DataFrame, optional): Trials dataframe from `get_trials`, to avoid parsing the session again.
+
+    Returns:
+        str: Path to the generated report.
+    """
     template = env.get_template(SESSION_REPORT_TEMPLATE)
 
     metadata = get_metadata(path)
-    trials = get_trials(path, lever_durations=lever_durations)
-    session_summary = summary(path=path, lever_durations=lever_durations)
+    if trials is None:
+        trials = get_trials(path, lever_durations=lever_durations)
+    session_summary = summary(trials)
 
     template_identifiers = {
         "subject_id": metadata.get("animal_id"),
@@ -701,31 +736,31 @@ def generate_report(path: str, output_dir: str = ".", lever_durations: str | Non
             session_summary.get("cued_wc"), session_summary.get("precued"), as_html=True
         ),
         "fig_rt_median": plots.plot_rt_median(
-            get_rts(path=path, include_corrections=False),
+            _select_rts(trials, include_corrections=False),
             stimulus_duration=metadata.get("stimulus_duration", 4000) / 1000,
             as_html=True,
         )
         if is_targetonly(metadata.get("protocol"))
         else plots.plot_rt_medians_from_dict(
             {
-                "all": get_rts(path=path, include_corrections=False),
-                "hits": get_rts(path=path, sdt_type="hit", include_corrections=False),
-                "false_alarms": get_rts(path=path, sdt_type="false_alarm", include_corrections=False),
+                "all": _select_rts(trials, include_corrections=False),
+                "hits": _select_rts(trials, sdt_type="hit", include_corrections=False),
+                "false_alarms": _select_rts(trials, sdt_type="false_alarm", include_corrections=False),
             },
             stimulus_duration=metadata.get("stimulus_duration", 4000) / 1000,
             as_html=True,
         ),
         "fig_rt_median_wc": plots.plot_rt_median(
-            get_rts(path=path, include_corrections=True),
+            _select_rts(trials, include_corrections=True),
             stimulus_duration=metadata.get("stimulus_duration", 4000) / 1000,
             as_html=True,
         )
         if is_targetonly(metadata.get("protocol"))
         else plots.plot_rt_medians_from_dict(
             {
-                "all": get_rts(path=path, include_corrections=True),
-                "hits": get_rts(path=path, sdt_type="hit", include_corrections=True),
-                "false_alarms": get_rts(path=path, sdt_type="false_alarm", include_corrections=True),
+                "all": _select_rts(trials, include_corrections=True),
+                "hits": _select_rts(trials, sdt_type="hit", include_corrections=True),
+                "false_alarms": _select_rts(trials, sdt_type="false_alarm", include_corrections=True),
             },
             stimulus_duration=metadata.get("stimulus_duration", 4000) / 1000,
             as_html=True,
@@ -772,7 +807,7 @@ def generate_report(path: str, output_dir: str = ".", lever_durations: str | Non
         "fig_sdt_timeseries": plots.plot_trial_timeseries(trials=trials, use_sdt=True, as_html=True),
     }
 
-    if LEVER_DURATION in trials.columns:
+    if LEVER_DURATION in trials.columns and trials[LEVER_DURATION].notna().any():
         for fig_key, include_corrections in (
             ("fig_lever_duration_median", False),
             ("fig_lever_duration_median_wc", True),
