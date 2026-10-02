@@ -52,6 +52,8 @@ visiomode-analysis session path/to/session.json -o output/ --no-report
 visiomode-analysis session path/to/session.json -o output/ --with-regressors --regressor-timestamps frame_times.csv
 ```
 
+**Lever push durations.** If a `sub-<id>_exp-<experiment>_ses-<date>_lever-durations.csv` file (columns `push_id`, `duration` in ms) sits next to the session JSON, `session` matches each push to its lever push trial (precued trials, hits and false alarms, in trial order) and adds a `lever_duration` column to the trials CSV. Point it at a file elsewhere with `--lever-durations path/to/durations.csv`. Non lever-push or sessions without a durations file have no `lever_duration` column.
+
 **Generate regressors** for an already-processed session, aligned to an external timestamp series:
 
 ```bash
@@ -71,6 +73,8 @@ visiomode-analysis session-start-time path/to/session.json
 ```bash
 visiomode-analysis subject path/to/subject_dir/ -o output/
 ```
+
+When the trials CSVs have a `lever_duration` column, the summary also reports `lever_duration_<mean|median|sd|iqr>[_<subset>][_wc]` (in ms) for all lever pushes and for the `cued`, `hits`, `false_alarms` and `precued` subsets, with `_wc` variants that include correction trials. These columns are omitted if no session has lever durations.
 
 Run `visiomode-analysis --help` or `visiomode-analysis <command> --help` for full option details.
 
