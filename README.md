@@ -52,7 +52,7 @@ visiomode-analysis session path/to/session.json -o output/ --no-report
 visiomode-analysis session path/to/session.json -o output/ --with-regressors --regressor-timestamps frame_times.csv
 ```
 
-**Lever push durations.** If a `sub-<id>_exp-<experiment>_ses-<date>_lever-durations.csv` file (columns `push_id`, `duration` in ms) sits next to the session JSON, `session` matches each push to its lever push trial (precued trials, hits and false alarms, in trial order) and adds a `lever_duration` column to the trials CSV. Point it at a file elsewhere with `--lever-durations path/to/durations.csv`. Non lever-push or sessions without a durations file have no `lever_duration` column.
+**Lever push durations.** If a `sub-<id>_exp-<experiment>_ses-<date>_lever-durations.csv` file (columns `push_id`, `duration` in ms) sits next to the session JSON, `session` matches each push to its lever push trial (precued trials, hits and false alarms, in trial order) and adds a `lever_duration` column to the trials CSV. Point it at a file elsewhere with `--lever-durations path/to/durations.csv`. Trials without a lever push have an empty `lever_duration`, and sessions without a durations file have no `lever_duration` column at all. If the durations can't be matched (the file is empty or malformed, `push_id` doesn't run 0..n-1, or the number of pushes doesn't match the number of lever push trials), a warning is printed and the column is left empty for that session.
 
 **Generate regressors** for an already-processed session, aligned to an external timestamp series:
 
@@ -89,7 +89,7 @@ trials = session.get_trials("path/to/session.json")
 metadata = session.get_metadata("path/to/session.json")
 summary = session.summary(trials)
 
-session.generate_report(trials, metadata, output_dir="output/")
+session.generate_report("path/to/session.json", output_dir="output/", trials=trials)
 ```
 
 ### Input files and naming convention
