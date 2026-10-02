@@ -102,12 +102,12 @@ def plot_correction_pie(num_random, num_correction, as_html=False) -> str | go.F
     return fig
 
 
-def _rt_stats(rts) -> tuple[float, float, float]:
-    """Median and 25th/75th percentiles of a reaction-time array, NaN for an empty one."""
-    rts = np.asarray(rts, dtype=float)
-    if rts.size == 0:
+def _median_iqr(values) -> tuple[float, float, float]:
+    """Median and 25th/75th percentiles of an array, NaN for an empty one."""
+    values = np.asarray(values, dtype=float)
+    if values.size == 0:
         return np.nan, np.nan, np.nan
-    return float(np.median(rts)), float(np.percentile(rts, 25)), float(np.percentile(rts, 75))
+    return float(np.median(values)), float(np.percentile(values, 25)), float(np.percentile(values, 75))
 
 
 def _rt_yaxis_range(stimulus_duration) -> list[float] | None:
@@ -118,15 +118,15 @@ def _rt_yaxis_range(stimulus_duration) -> list[float] | None:
 
 
 def plot_rt_median(rts, stimulus_duration=4, as_html=False) -> str | go.Figure:
-    median, q25, q75 = _rt_stats(rts)
+    median, q25, q75 = _median_iqr(rts)
     fig = go.Figure(
         go.Scatter(
             y=[median],
             error_y=dict(
                 type="data",
                 symmetric=False,
-                array=[q75],
-                arrayminus=[q25],
+                array=[q75 - median],
+                arrayminus=[median - q25],
             ),
         ),
         layout=go.Layout(
@@ -142,23 +142,31 @@ def plot_rt_median(rts, stimulus_duration=4, as_html=False) -> str | go.Figure:
 
 
 def plot_rt_medians_from_dict(rt_dict: dict, stimulus_duration: int = 4, as_html=True) -> str | go.Figure:
-    stats = [_rt_stats(rt) for rt in rt_dict.values()]
+    return _plot_medians_from_dict(rt_dict, yaxis_range=_rt_yaxis_range(stimulus_duration), as_html=as_html)
+
+
+def _plot_medians_from_dict(
+    data: dict, yaxis_range: list[float] | None = None, yaxis_title: str | None = None, as_html=True
+) -> str | go.Figure:
+    """One marker per key at the median of its values, with error bars spanning the IQR."""
+    stats = [_median_iqr(values) for values in data.values()]
     fig = go.Figure(
         go.Scatter(
             y=[median for median, _, _ in stats],
-            x=[key for key in rt_dict.keys()],
+            x=[key for key in data.keys()],
             error_y=dict(
                 type="data",
                 symmetric=False,
-                array=[q75 for _, _, q75 in stats],
-                arrayminus=[q25 for _, q25, _ in stats],
+                array=[q75 - median for median, _, q75 in stats],
+                arrayminus=[median - q25 for median, q25, _ in stats],
             ),
             mode="markers",
         ),
         layout=go.Layout(
             margin={"l": 20, "r": 20, "t": 20, "b": 20},
+            yaxis_title=yaxis_title,
         ),
-        layout_yaxis_range=_rt_yaxis_range(stimulus_duration),
+        layout_yaxis_range=yaxis_range,
     )
 
     if as_html:
@@ -167,6 +175,11 @@ def plot_rt_medians_from_dict(rt_dict: dict, stimulus_duration: int = 4, as_html
 
 
 def plot_rt_distribution(rts, as_html=False) -> str | go.Figure: ...
+
+
+def plot_lever_duration_medians_from_dict(duration_dict: dict, as_html=True) -> str | go.Figure:
+    """Median lever push duration (ms) per trial subset, with error bars spanning the IQR."""
+    return _plot_medians_from_dict(duration_dict, yaxis_title="Duration (ms)", as_html=as_html)
 
 
 def plot_single_yvalue(value, ymin=0.0, ymax=1.0, as_html=False):

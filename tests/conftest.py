@@ -79,12 +79,41 @@ def write_aligned_h5(gonogo_session_json_path):
 
 
 @pytest.fixture
+def gonogo_session_with_lever_durations(tmp_path, gonogo_session_json_path):
+    """A BIDS-named copy of `gonogo_session_json_path` with a sibling `_lever-durations.csv` holding one
+    duration per lever push trial (precued, hits and false alarms), numbered 100, 101, ... in trial order.
+    Returns the paths of the JSON and of the durations file."""
+    json_path = tmp_path / "sub-MM229_exp-expX_ses-20220101_behaviour-hf.json"
+    json_path.write_text(pathlib.Path(gonogo_session_json_path).read_text())
+
+    trials = session.get_trials(gonogo_session_json_path)
+    num_pushes = int(((trials["outcome"] == "precued") | trials["sdt_type"].isin(["hit", "false_alarm"])).sum())
+    durations_path = tmp_path / "sub-MM229_exp-expX_ses-20220101_lever-durations.csv"
+    pd.DataFrame({"push_id": range(num_pushes), "duration": 100.0 + np.arange(num_pushes)}).to_csv(
+        durations_path, index=False
+    )
+    return str(json_path), str(durations_path)
+
+
+@pytest.fixture
 def write_trials_csv():
     """Factory fixture that writes a minimal preprocessed trials.csv with just enough columns
-    for `session.summary` (and therefore `subject.collate_sessions`) to run on."""
+    for `session.summary` (and therefore `subject.collate_sessions`) to run on. `lever_durations=True`
+    adds a `lever_duration` column to the default trials; pass `rows` to replace them (include a
+    `lever_duration` key in each row for durations)."""
 
-    def _write(directory, filename, animal_id, session_date, protocol, experiment, environment="unknown"):
-        rows = [
+    def _write(
+        directory,
+        filename,
+        animal_id,
+        session_date,
+        protocol,
+        experiment,
+        environment="unknown",
+        lever_durations=False,
+        rows=None,
+    ):
+        default_rows = [
             dict(outcome="correct", correction=False, sdt_type="hit", response_time=0.5, response="leverpush"),
             dict(
                 outcome="incorrect", correction=False, sdt_type="false_alarm", response_time=0.3, response="leverpush"
@@ -95,12 +124,17 @@ def write_trials_csv():
             dict(outcome="incorrect", correction=True, sdt_type=None, response_time=np.nan, response=None),
             dict(outcome="precued", correction=False, sdt_type=None, response_time=np.nan, response=None),
         ]
-        df = pd.DataFrame(rows)
+        df = pd.DataFrame(default_rows if rows is None else rows)
         df["animal_id"] = animal_id
         df["session_date"] = session_date
         df["protocol"] = protocol
         df["experiment"] = experiment
         df["environment"] = environment
+        if lever_durations:
+            if rows is not None:
+                raise ValueError("lever_durations=True only applies to the default rows")
+            # Lever pushes are the hit, false alarm and precued trials.
+            df["lever_duration"] = [80.0, 120.0, np.nan, np.nan, 60.0]
 
         path = os.path.join(directory, filename)
         df.to_csv(path, index=False)

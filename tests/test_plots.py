@@ -56,9 +56,11 @@ def test_plot_rt_median_reports_median_and_iqr_of_rts():
     fig = plots.plot_rt_median(rts, stimulus_duration=5)
     scatter = fig.data[0]
 
-    assert scatter.y[0] == pytest.approx(np.median(rts))
-    assert scatter.error_y.array[0] == pytest.approx(np.percentile(rts, 75))
-    assert scatter.error_y.arrayminus[0] == pytest.approx(np.percentile(rts, 25))
+    median = np.median(rts)
+    assert scatter.y[0] == pytest.approx(median)
+    # Error bars are offsets from the median, so together they span the IQR.
+    assert scatter.error_y.array[0] == pytest.approx(np.percentile(rts, 75) - median)
+    assert scatter.error_y.arrayminus[0] == pytest.approx(median - np.percentile(rts, 25))
     assert fig.layout.yaxis.range == pytest.approx((0, 5))
 
 
@@ -71,6 +73,10 @@ def test_plot_rt_medians_from_dict_preserves_key_order_and_per_key_stats():
     assert list(scatter.x) == ["all", "hits"]
     assert scatter.y[0] == pytest.approx(np.median(rt_dict["all"]))
     assert scatter.y[1] == pytest.approx(np.median(rt_dict["hits"]))
+    for i, rts in enumerate(rt_dict.values()):
+        median = np.median(rts)
+        assert scatter.error_y.array[i] == pytest.approx(np.percentile(rts, 75) - median)
+        assert scatter.error_y.arrayminus[i] == pytest.approx(median - np.percentile(rts, 25))
     assert fig.layout.yaxis.range == pytest.approx((0, 4))
 
 
@@ -223,6 +229,22 @@ def test_plot_trial_timeseries_falls_back_to_violet_for_unknown_category():
     assert fig.data[0].marker.color == "violet"
 
 
+def test_plot_lever_duration_medians_from_dict_reports_median_and_iqr_offsets():
+    duration_dict = {"all": [60.0, 80.0, 100.0, 120.0, 140.0], "false_alarms": []}
+
+    fig = plots.plot_lever_duration_medians_from_dict(duration_dict, as_html=False)
+    scatter = fig.data[0]
+
+    assert list(scatter.x) == ["all", "false_alarms"]
+    median = np.median(duration_dict["all"])
+    assert scatter.y[0] == pytest.approx(median)
+    # Error bars are offsets from the median, so together they span the IQR.
+    assert scatter.error_y.array[0] == pytest.approx(np.percentile(duration_dict["all"], 75) - median)
+    assert scatter.error_y.arrayminus[0] == pytest.approx(median - np.percentile(duration_dict["all"], 25))
+    assert np.isnan(scatter.y[1])
+    assert fig.layout.yaxis.range is None
+
+
 # -- Every plotting function also supports as_html=True, returning an embeddable HTML div. --
 
 
@@ -235,6 +257,7 @@ def test_plot_trial_timeseries_falls_back_to_violet_for_unknown_category():
         lambda: plots.plot_sdt_pie(1, 2, 3, 4, as_html=True),
         lambda: plots.plot_rt_median([0.1, 0.2, 0.3], as_html=True),
         lambda: plots.plot_rt_medians_from_dict({"all": [0.1, 0.2]}, as_html=True),
+        lambda: plots.plot_lever_duration_medians_from_dict({"all": [80.0, 90.0]}, as_html=True),
         lambda: plots.plot_single_yvalue(0.5, as_html=True),
         lambda: plots.plot_roc(0.5, 0.5, as_html=True),
         lambda: plots.plot_dprime(1.0, as_html=True),

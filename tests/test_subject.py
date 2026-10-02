@@ -145,3 +145,27 @@ def test_collate_sessions_raises_when_all_sessions_are_excluded_and_not_ignoring
 
     with pytest.raises(FileNotFoundError, match="not marked as excluded"):
         subject.collate_sessions(directory=str(tmp_path), output_dir=None, ignore=False)
+
+
+# -- Lever push durations --
+
+
+def test_collate_sessions_includes_lever_duration_metrics_when_present(tmp_path, write_trials_csv):
+    write_trials_csv(tmp_path, "a_trials.csv", "A1", "2022-01-01", "gonogo", "expX", lever_durations=True)
+    write_trials_csv(tmp_path, "b_trials.csv", "A1", "2022-01-02", "gonogo", "expX")
+
+    subject_df = subject.collate_sessions(directory=str(tmp_path), output_dir=None)
+
+    assert subject_df["lever_duration_median"].iloc[0] == pytest.approx(80.0)
+    assert subject_df["lever_duration_median_hits"].iloc[0] == pytest.approx(80.0)
+    # Sessions without durations are left empty.
+    assert pd.isna(subject_df["lever_duration_median"].iloc[1])
+
+
+def test_collate_sessions_omits_lever_duration_metrics_when_no_session_has_them(tmp_path, write_trials_csv):
+    write_trials_csv(tmp_path, "a_trials.csv", "A1", "2022-01-01", "gonogo", "expX")
+    write_trials_csv(tmp_path, "b_trials.csv", "A1", "2022-01-02", "gonogo", "expX")
+
+    subject_df = subject.collate_sessions(directory=str(tmp_path), output_dir=None)
+
+    assert not any(column.startswith("lever_duration") for column in subject_df.columns)

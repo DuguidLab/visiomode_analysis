@@ -1,5 +1,6 @@
 import datetime
 import json
+import warnings
 import pathlib
 import shutil
 
@@ -261,3 +262,253 @@ def test_generate_regressors_rejects_unsupported_protocol(tmp_path):
 
     with pytest.raises(NotImplementedError):
         session.generate_regressors(trials_df, metadata, str(timestamps_path), output_dir=str(tmp_path))
+
+
+# -- Lever push durations (from a sibling `_lever-durations.csv`) --
+
+
+def _lever_push_mask(trials):
+    return (trials["outcome"] == "precued") | trials["sdt_type"].isin(["hit", "false_alarm"])
+
+
+def test_find_lever_durations_pairs_bids_named_json_with_sibling_csv(gonogo_session_with_lever_durations):
+    json_path, durations_path = gonogo_session_with_lever_durations
+
+    assert session.find_lever_durations(json_path) == durations_path
+
+
+def test_find_lever_durations_returns_none_without_a_sibling_csv(gonogo_session_json_path):
+    assert session.find_lever_durations(gonogo_session_json_path) is None
+
+
+def test_get_trials_assigns_lever_durations_to_push_trials_in_order(gonogo_session_with_lever_durations):
+    json_path, _ = gonogo_session_with_lever_durations
+
+    trials = session.get_trials(json_path)
+
+    is_push = _lever_push_mask(trials)
+    assert list(trials.loc[is_push, "lever_duration"]) == [100.0 + i for i in range(is_push.sum())]
+    assert trials.loc[~is_push, "lever_duration"].isna().all()
+
+
+def test_get_trials_omits_lever_duration_column_without_a_durations_file(gonogo_session_json_path):
+    trials = session.get_trials(gonogo_session_json_path)
+
+    assert "lever_duration" not in trials.columns
+
+
+def test_get_trials_uses_explicit_lever_durations_path_over_sibling(gonogo_session_with_lever_durations, tmp_path):
+    json_path, durations_path = gonogo_session_with_lever_durations
+    durations = pd.read_csv(durations_path)
+    override_path = tmp_path / "override.csv"
+    durations.assign(duration=durations["duration"] + 1000).to_csv(override_path, index=False)
+
+    trials = session.get_trials(json_path, lever_durations=str(override_path))
+
+    assert trials["lever_duration"].min() == 1100.0
+
+
+def test_get_trials_matches_lever_durations_by_push_id_not_file_order(gonogo_session_with_lever_durations):
+    json_path, durations_path = gonogo_session_with_lever_durations
+    durations = pd.read_csv(durations_path)
+    durations.iloc[::-1].to_csv(durations_path, index=False)
+
+    trials = session.get_trials(json_path)
+
+    assert list(trials.loc[_lever_push_mask(trials), "lever_duration"]) == list(durations["duration"])
+
+
+def test_get_trials_warns_and_leaves_lever_durations_empty_on_count_mismatch(gonogo_session_with_lever_durations):
+    json_path, durations_path = gonogo_session_with_lever_durations
+    pd.read_csv(durations_path).iloc[:-1].to_csv(durations_path, index=False)
+
+    with pytest.warns(UserWarning, match="lever pushes"):
+        trials = session.get_trials(json_path)
+
+    assert "lever_duration" in trials.columns
+    assert trials["lever_duration"].isna().all()
+
+
+def _write_lever_duration_trials_csv(tmp_path, write_trials_csv):
+    rows = [
+        dict(outcome="correct", correction=False, sdt_type="hit", lever_duration=80.0),
+        dict(outcome="correct", correction=False, sdt_type="hit", lever_duration=100.0),
+        dict(outcome="correct", correction=True, sdt_type="hit", lever_duration=200.0),
+        dict(outcome="incorrect", correction=False, sdt_type="false_alarm", lever_duration=120.0),
+        dict(outcome="correct", correction=False, sdt_type="correct_rejection", lever_duration=np.nan),
+        dict(outcome="precued", correction=False, sdt_type=None, lever_duration=60.0),
+    ]
+    for row in rows:
+        row["response"] = "leverpush" if not np.isnan(row["lever_duration"]) else None
+        row["response_time"] = 0.5 if row["sdt_type"] in ("hit", "false_alarm") else np.nan
+    return write_trials_csv(tmp_path, "trials.csv", "A1", "2022-01-01", "gonogo", "expX", rows=rows)
+
+
+def _iqr(values):
+    return np.percentile(values, 75) - np.percentile(values, 25)
+
+
+@pytest.mark.parametrize(
+    "subset, durations, durations_wc",
+    [
+        ("", [80.0, 100.0, 120.0, 60.0], [80.0, 100.0, 200.0, 120.0, 60.0]),
+        ("_cued", [80.0, 100.0, 120.0], [80.0, 100.0, 200.0, 120.0]),
+        ("_hits", [80.0, 100.0], [80.0, 100.0, 200.0]),
+        ("_false_alarms", [120.0], [120.0]),
+        ("_precued", [60.0], [60.0]),
+    ],
+)
+def test_summary_reports_lever_duration_stats_per_subset(tmp_path, write_trials_csv, subset, durations, durations_wc):
+    result = session.summary(_write_lever_duration_trials_csv(tmp_path, write_trials_csv))
+
+    for suffix, values in (("", durations), ("_wc", durations_wc)):
+        assert result[f"lever_duration_mean{subset}{suffix}"] == pytest.approx(np.mean(values))
+        assert result[f"lever_duration_median{subset}{suffix}"] == pytest.approx(np.median(values))
+        assert result[f"lever_duration_iqr{subset}{suffix}"] == pytest.approx(_iqr(values))
+        if len(values) > 1:
+            assert result[f"lever_duration_sd{subset}{suffix}"] == pytest.approx(np.std(values, ddof=1))
+        else:
+            assert np.isnan(result[f"lever_duration_sd{subset}{suffix}"])
+
+
+def test_summary_reports_nan_lever_duration_stats_for_empty_subsets(tmp_path, write_trials_csv):
+    csv_path = _write_lever_duration_trials_csv(tmp_path, write_trials_csv)
+    df = pd.read_csv(csv_path)
+    df[df["sdt_type"] != "false_alarm"].to_csv(csv_path, index=False)
+
+    result = session.summary(csv_path)
+
+    for stat in session.LEVER_DURATION_STATS:
+        assert np.isnan(result[f"lever_duration_{stat}_false_alarms"])
+        assert np.isnan(result[f"lever_duration_{stat}_false_alarms_wc"])
+
+
+def test_summary_has_forty_lever_duration_fields_when_durations_are_present(gonogo_session_with_lever_durations):
+    json_path, _ = gonogo_session_with_lever_durations
+
+    result = session.summary(json_path)
+
+    # 4 stats x 5 subsets x with/without corrections.
+    assert len([key for key in result if key.startswith("lever_duration_")]) == 40
+
+
+def test_summary_omits_lever_duration_fields_without_durations(gonogo_session_json_path):
+    result = session.summary(gonogo_session_json_path)
+
+    assert not any(key.startswith("lever_duration") for key in result)
+
+
+def test_generate_report_includes_lever_duration_plot_only_when_durations_are_present(
+    gonogo_session_with_lever_durations, gonogo_session_json_path, tmp_path
+):
+    json_path, _ = gonogo_session_with_lever_durations
+
+    with_durations = pathlib.Path(session.generate_report(json_path, output_dir=str(tmp_path)))
+    without_durations = pathlib.Path(session.generate_report(gonogo_session_json_path, output_dir=str(tmp_path)))
+
+    assert "Median lever push duration" in with_durations.read_text(encoding="utf-8")
+    assert "Median lever push duration" not in without_durations.read_text(encoding="utf-8")
+
+
+def test_get_trials_warns_and_leaves_lever_durations_empty_without_expected_columns(
+    gonogo_session_with_lever_durations,
+):
+    json_path, durations_path = gonogo_session_with_lever_durations
+    pd.read_csv(durations_path).rename(columns={"push_id": "id"}).to_csv(durations_path, index=False)
+
+    with pytest.warns(UserWarning, match="missing column.*push_id"):
+        trials = session.get_trials(json_path)
+
+    assert trials["lever_duration"].isna().all()
+
+
+@pytest.mark.parametrize("push_ids", ["duplicated", "gapped"])
+def test_get_trials_warns_and_leaves_lever_durations_empty_on_bad_push_ids(
+    gonogo_session_with_lever_durations, push_ids
+):
+    json_path, durations_path = gonogo_session_with_lever_durations
+    durations = pd.read_csv(durations_path)
+    # Same number of pushes as lever push trials, but the IDs can't be trusted to line up with them.
+    durations.loc[1, "push_id"] = 0 if push_ids == "duplicated" else len(durations)
+    durations.to_csv(durations_path, index=False)
+
+    with pytest.warns(UserWarning, match="push_id"):
+        trials = session.get_trials(json_path)
+
+    assert trials["lever_duration"].isna().all()
+
+
+def test_summary_accepts_a_trials_dataframe(gonogo_session_with_lever_durations):
+    json_path, _ = gonogo_session_with_lever_durations
+
+    from_dataframe = session.summary(session.get_trials(json_path))
+    from_json = session.summary(json_path)
+
+    assert from_dataframe.keys() == from_json.keys()
+    for key, value in from_json.items():
+        # NaN != NaN, so missing values have to be compared separately.
+        assert from_dataframe[key] == value or (pd.isna(from_dataframe[key]) and pd.isna(value)), key
+
+
+def test_preprocess_session_uses_lever_durations_override_throughout(gonogo_session_with_lever_durations, tmp_path):
+    json_path, durations_path = gonogo_session_with_lever_durations
+    override_path = tmp_path / "override.csv"
+    pd.read_csv(durations_path).to_csv(override_path, index=False)
+    # A stale sibling that would warn if anything fell back to auto-detection.
+    pd.read_csv(durations_path).iloc[:-1].to_csv(durations_path, index=False)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        session.preprocess_session(json_path, output_dir=str(out_dir), lever_durations=str(override_path))
+
+    (report_path,) = out_dir.glob("*_report-session.html")
+    assert "Median lever push duration" in report_path.read_text(encoding="utf-8")
+
+
+def test_generate_report_omits_lever_duration_plot_when_durations_could_not_be_matched(
+    gonogo_session_with_lever_durations, tmp_path
+):
+    json_path, durations_path = gonogo_session_with_lever_durations
+    pd.read_csv(durations_path).iloc[:-1].to_csv(durations_path, index=False)
+
+    with pytest.warns(UserWarning):
+        report_path = pathlib.Path(session.generate_report(json_path, output_dir=str(tmp_path)))
+
+    assert "Median lever push duration" not in report_path.read_text(encoding="utf-8")
+
+
+def test_get_trials_warns_and_leaves_lever_durations_empty_on_empty_file(gonogo_session_with_lever_durations):
+    json_path, durations_path = gonogo_session_with_lever_durations
+    pathlib.Path(durations_path).write_text("")
+
+    with pytest.warns(UserWarning, match="Can't match"):
+        trials = session.get_trials(json_path)
+
+    assert trials["lever_duration"].isna().all()
+
+
+def test_get_trials_warns_and_leaves_lever_durations_empty_on_non_numeric_duration(
+    gonogo_session_with_lever_durations,
+):
+    json_path, durations_path = gonogo_session_with_lever_durations
+    durations = pd.read_csv(durations_path)
+    # Right number of pushes with valid IDs, so the non-numeric value is the only problem.
+    durations["duration"] = durations["duration"].astype(object)
+    durations.loc[1, "duration"] = "not-a-number"
+    durations.to_csv(durations_path, index=False)
+
+    with pytest.warns(UserWarning, match="not-a-number"):
+        trials = session.get_trials(json_path)
+
+    assert trials["lever_duration"].isna().all()
+
+
+def test_summary_reads_metadata_from_a_filtered_trials_dataframe(gonogo_session_json_path):
+    trials = session.get_trials(gonogo_session_json_path)
+    # Dropping the first trial leaves an index that no longer starts at 0.
+    result = session.summary(trials.iloc[1:])
+
+    assert result["animal_id"] == "MM229"
+    assert result["protocol"] == "gonogo"

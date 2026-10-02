@@ -121,6 +121,13 @@
             <h6>Median reaction time</h6>
             {{ fig_rt_median | safe }}
         </div>
+
+        {% if fig_lever_duration_median %}
+        <div class="row mb-2 mt-4">
+            <h6>Median lever push duration</h6>
+            {{ fig_lever_duration_median | safe }}
+        </div>
+        {% endif %}
     </div>
 
     {% if corrections_enabled %}
@@ -143,6 +150,13 @@
             <h6>Median reaction time (all trials)</h6>
             {{ fig_rt_median_wc | safe }}
         </div>
+
+        {% if fig_lever_duration_median_wc %}
+        <div class="row mb-2 mt-4">
+            <h6>Median lever push duration (all trials)</h6>
+            {{ fig_lever_duration_median_wc | safe }}
+        </div>
+        {% endif %}
     </div>
 
     <hr>
