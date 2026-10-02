@@ -56,9 +56,11 @@ def test_plot_rt_median_reports_median_and_iqr_of_rts():
     fig = plots.plot_rt_median(rts, stimulus_duration=5)
     scatter = fig.data[0]
 
-    assert scatter.y[0] == pytest.approx(np.median(rts))
-    assert scatter.error_y.array[0] == pytest.approx(np.percentile(rts, 75))
-    assert scatter.error_y.arrayminus[0] == pytest.approx(np.percentile(rts, 25))
+    median = np.median(rts)
+    assert scatter.y[0] == pytest.approx(median)
+    # Error bars are offsets from the median, so together they span the IQR.
+    assert scatter.error_y.array[0] == pytest.approx(np.percentile(rts, 75) - median)
+    assert scatter.error_y.arrayminus[0] == pytest.approx(median - np.percentile(rts, 25))
     assert fig.layout.yaxis.range == pytest.approx((0, 5))
 
 
@@ -71,6 +73,10 @@ def test_plot_rt_medians_from_dict_preserves_key_order_and_per_key_stats():
     assert list(scatter.x) == ["all", "hits"]
     assert scatter.y[0] == pytest.approx(np.median(rt_dict["all"]))
     assert scatter.y[1] == pytest.approx(np.median(rt_dict["hits"]))
+    for i, rts in enumerate(rt_dict.values()):
+        median = np.median(rts)
+        assert scatter.error_y.array[i] == pytest.approx(np.percentile(rts, 75) - median)
+        assert scatter.error_y.arrayminus[i] == pytest.approx(median - np.percentile(rts, 25))
     assert fig.layout.yaxis.range == pytest.approx((0, 4))
 
 
