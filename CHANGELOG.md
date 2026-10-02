@@ -12,11 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Lever push durations.** `visiomode-analysis session` picks up a sibling
   `sub-<id>_exp-<experiment>_ses-<date>_lever-durations.csv` (or one passed with
   `--lever-durations`) and adds a `lever_duration` column (ms) to the trials CSV,
-  matching pushes to precued, hit and false alarm trials in order. A count mismatch
-  warns and leaves the column empty; no durations file means no column. Session and
+  matching pushes to precued, hit and false alarm trials in order. If the file can't
+  be matched (empty or unparseable, missing `push_id`/`duration` columns, non-numeric
+  durations, `push_id` not running 0..n-1, or a push count that differs from the
+  number of lever push trials) a warning is printed and the column is left empty; no
+  durations file means no column. Session and
   subject summaries report the mean, median, SD and IQR of lever durations for all
   pushes, cued pushes, hits, false alarms and precued trials, each with a `_wc`
   variant, and the session report gains a median lever push duration plot.
+- **Summaries and reports from an existing trials dataframe.** `session.summary()` now
+  also accepts a trials dataframe from `session.get_trials()`, and
+  `session.generate_report()` takes an optional `trials` dataframe, so a session is
+  parsed once rather than re-read for every metric and plot.
 
 ### Fixed
 
