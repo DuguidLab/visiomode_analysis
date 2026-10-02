@@ -125,8 +125,8 @@ def plot_rt_median(rts, stimulus_duration=4, as_html=False) -> str | go.Figure:
             error_y=dict(
                 type="data",
                 symmetric=False,
-                array=[q75],
-                arrayminus=[q25],
+                array=[q75 - median],
+                arrayminus=[median - q25],
             ),
         ),
         layout=go.Layout(
@@ -150,8 +150,8 @@ def plot_rt_medians_from_dict(rt_dict: dict, stimulus_duration: int = 4, as_html
             error_y=dict(
                 type="data",
                 symmetric=False,
-                array=[q75 for _, _, q75 in stats],
-                arrayminus=[q25 for _, q25, _ in stats],
+                array=[q75 - median for median, _, q75 in stats],
+                arrayminus=[median - q25 for median, q25, _ in stats],
             ),
             mode="markers",
         ),
