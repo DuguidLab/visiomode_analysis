@@ -1,10 +1,12 @@
-"""Tests for `session._flatten_trials`'s handling of older Visiomode JSON formats: sessions
+"""Tests for `session._flatten_trials`'s handling of different Visiomode JSON formats: sessions
 recorded before an explicit `stimulus`/`sdt_type` field existed on each trial, where the presented
 stimulus and signal-detection classification instead have to be reconstructed from the trial's
-`outcome`/`response` and the session-level `stimuli` metadata.
+`outcome`/`response` and the session-level `stimuli` metadata, and newer (0.5+) sessions that record
+a trial without a response as a response named "none".
 """
 
 import numpy as np
+import pytest
 
 BASE_TRIAL = dict(
     timestamp="2022-01-01T00:00:01",
@@ -172,3 +174,59 @@ def test_legacy_other_protocol_uses_raw_stimuli_dict_unchanged(flatten_trial):
     assert trial["target_id"] == "movinggrating"
     assert trial["distractor_id"] == "isoluminantgray"
     assert "stim_id" not in trial
+
+
+# -- Visiomode 0.5+ records "no response" as a response named "none", with the trial timeout as its response time. --
+
+NEWER_STIMULUS = {"id": "movinggrating", "common_name": "Moving Grating"}
+
+
+@pytest.mark.parametrize(
+    "outcome, sdt_type, timeout",
+    [("no_response", "miss", 10.001618658035703), ("correct", "correct_rejection", 4.000969302495185)],
+)
+def test_none_response_is_treated_as_no_response(flatten_trial, outcome, sdt_type, timeout):
+    trial = flatten_trial(
+        {
+            **BASE_TRIAL,
+            "outcome": outcome,
+            "sdt_type": sdt_type,
+            "response": {"name": "none"},
+            "response_time": timeout,
+            "stimulus": NEWER_STIMULUS,
+        }
+    )
+
+    assert trial["response"] is None
+    # The timeout is not a reaction time.
+    assert np.isnan(trial["response_time"])
+    assert trial["pos_x"] is None and trial["pos_y"] is None
+    assert trial["dist_x"] is None and trial["dist_y"] is None
+    assert trial["sdt_type"] == sdt_type
+    # No response timestamp, so the trial runs to the end of the stimulus.
+    assert trial["stop_time"] == pytest.approx(1.0 + BASE_TRIAL["iti"] + 4.0)
+
+
+def test_named_lever_push_response_keeps_its_response_time(flatten_trial):
+    trial = flatten_trial(
+        {
+            **BASE_TRIAL,
+            "sdt_type": "hit",
+            "response": {"name": "leverpush", "timestamp": "2022-01-01T00:00:08", "pos_x": 400.0, "pos_y": 240.0},
+            "response_time": 2.23,
+            "stimulus": NEWER_STIMULUS,
+        }
+    )
+
+    assert trial["response"] == "leverpush"
+    assert trial["response_time"] == pytest.approx(2.23)
+    assert trial["pos_x"] == 400.0
+
+
+def test_none_response_is_normalised_before_sdt_inference(flatten_trial):
+    # Without an explicit sdt_type, a "none" response must still be read as no response,
+    # so a correct gonogo trial is a correct rejection rather than a hit.
+    trial = flatten_trial({**BASE_TRIAL, "outcome": "correct", "response": {"name": "none"}, "response_time": 4.0})
+
+    assert trial["sdt_type"] == "correct_rejection"
+    assert trial["stim_id"] == "isoluminantgray"
