@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Lever push durations.** `visiomode-analysis session` picks up a sibling
+  `sub-<id>_exp-<experiment>_ses-<date>_lever-durations.csv` (or one passed with
+  `--lever-durations`) and adds a `lever_duration` column (ms) to the trials CSV,
+  matching pushes to precued, hit and false alarm trials in order. A count mismatch
+  warns and leaves the column empty; no durations file means no column. Session and
+  subject summaries report the mean, median, SD and IQR of lever durations for all
+  pushes, cued pushes, hits, false alarms and precued trials, each with a `_wc`
+  variant, and the session report gains a median lever push duration plot.
+
 ## [0.3.0] - 2026-09-23
 
 ### Added
