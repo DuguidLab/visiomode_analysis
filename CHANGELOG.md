@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Trials without a response in Visiomode 0.5+ sessions.** Newer Visiomode versions
+  record misses and correct rejections as a response named `"none"`, with the trial
+  timeout (4–10 s) as the response time. These trials were treated as having a
+  response, so the timeout was counted as a reaction time in the session and subject
+  RT metrics and report plots, the trials got a touch position of 0, and gonogo
+  regressors gave them a cued lever push response regressor instead of the hold
+  regressor. They are now treated as having no response
+  (empty `response`, `response_time` and position). `session.summary()` also blanks
+  `"none"` responses in trials CSVs written by earlier versions, so `visiomode-analysis
+  subject` gives correct RTs without re-running `session`. Lever push durations were
+  not affected.
+
 ## [0.4.0] - 2026-10-02
 
 ### Added
