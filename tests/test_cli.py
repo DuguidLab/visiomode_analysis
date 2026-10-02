@@ -123,6 +123,23 @@ def test_regressors_cmd_writes_regressors_file(
     assert any(name.endswith("_regressors.npz") for name in os.listdir(tmp_path))
 
 
+def test_regressors_cmd_is_not_broken_by_a_malformed_lever_durations_file(
+    runner, gonogo_session_with_lever_durations, gonogo_regressor_timestamps_csv_path, tmp_path
+):
+    json_path, durations_path = gonogo_session_with_lever_durations
+    pd.read_csv(durations_path).rename(columns={"push_id": "id"}).to_csv(durations_path, index=False)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    result = runner.invoke(
+        session.regressors_cmd,
+        [json_path, "-o", str(out_dir), "--regressor-timestamps", gonogo_regressor_timestamps_csv_path],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert any(name.endswith("_regressors.npz") for name in os.listdir(out_dir))
+
+
 def test_regressors_cmd_accepts_h5_timestamps(runner, gonogo_session_json_path, write_aligned_h5, tmp_path):
     h5_path = write_aligned_h5(tmp_path / "aligned.h5")
 

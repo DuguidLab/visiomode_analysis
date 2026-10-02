@@ -98,13 +98,22 @@ def gonogo_session_with_lever_durations(tmp_path, gonogo_session_json_path):
 @pytest.fixture
 def write_trials_csv():
     """Factory fixture that writes a minimal preprocessed trials.csv with just enough columns
-    for `session.summary` (and therefore `subject.collate_sessions`) to run on, optionally with a
-    `lever_duration` column."""
+    for `session.summary` (and therefore `subject.collate_sessions`) to run on. `lever_durations=True`
+    adds a `lever_duration` column to the default trials; pass `rows` to replace them (include a
+    `lever_duration` key in each row for durations)."""
 
     def _write(
-        directory, filename, animal_id, session_date, protocol, experiment, environment="unknown", lever_durations=False
+        directory,
+        filename,
+        animal_id,
+        session_date,
+        protocol,
+        experiment,
+        environment="unknown",
+        lever_durations=False,
+        rows=None,
     ):
-        rows = [
+        default_rows = [
             dict(outcome="correct", correction=False, sdt_type="hit", response_time=0.5, response="leverpush"),
             dict(
                 outcome="incorrect", correction=False, sdt_type="false_alarm", response_time=0.3, response="leverpush"
@@ -115,13 +124,15 @@ def write_trials_csv():
             dict(outcome="incorrect", correction=True, sdt_type=None, response_time=np.nan, response=None),
             dict(outcome="precued", correction=False, sdt_type=None, response_time=np.nan, response=None),
         ]
-        df = pd.DataFrame(rows)
+        df = pd.DataFrame(default_rows if rows is None else rows)
         df["animal_id"] = animal_id
         df["session_date"] = session_date
         df["protocol"] = protocol
         df["experiment"] = experiment
         df["environment"] = environment
         if lever_durations:
+            if rows is not None:
+                raise ValueError("lever_durations=True only applies to the default rows")
             # Lever pushes are the hit, false alarm and precued trials.
             df["lever_duration"] = [80.0, 120.0, np.nan, np.nan, 60.0]
 
