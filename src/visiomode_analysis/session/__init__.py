@@ -22,6 +22,7 @@
 
 import os
 import json
+import warnings
 import click
 import datetime
 import h5py
@@ -56,6 +57,11 @@ TARGETONLY_PROTOCOLS = ("targetonly", "singletarget")
 # outcome vocabulary so downstream logic only has to deal with one set of labels.
 LEGACY_OUTCOME_LABELS = {"hit": "correct", "false_alarm": "incorrect", "miss": "no_response"}
 
+# Companion file holding the duration (ms) of every lever push in a session, one row per push in trial order.
+LEVER_DURATIONS_SUFFIX = "_lever-durations.csv"
+LEVER_DURATION = "lever_duration"
+LEVER_DURATION_STATS = ("mean", "median", "sd", "iqr")
+
 
 env = Environment(loader=PackageLoader("visiomode_analysis.reports", "templates"), autoescape=select_autoescape())
 
@@ -88,6 +94,12 @@ env = Environment(loader=PackageLoader("visiomode_analysis.reports", "templates"
     "--regressor-timestamps",
     type=click.Path(exists=True, dir_okay=False),
     help="Path to a CSV/TXT file of ISO timestamps, or a mesoscopy H5 with /timestamps_aligned, for regressor generation.",
+)
+@click.option(
+    "--lever-durations",
+    type=click.Path(exists=True, dir_okay=False),
+    help=f"Path to a lever push durations CSV (push_id, duration in ms). Defaults to the `*{LEVER_DURATIONS_SUFFIX}` "
+    "file next to the session JSON, if there is one.",
 )
 def session_cmd(**kwargs):
     """Generate a session report and extract trials from a Visiomode JSON file."""
@@ -137,6 +149,7 @@ def preprocess_session(
     no_report: bool = False,
     with_regressors: bool = False,
     regressor_timestamps: str | None = None,
+    lever_durations: str | None = None,
 ) -> str:
     """Generate a session summary report and trials file from a raw Visiomode JSON.
 
@@ -146,14 +159,15 @@ def preprocess_session(
         no_report (bool, optional): Whether to generate a session report. Defaults to False.
         with_regressors (bool, optional): Whether to generate regressors for the session. Defaults to False.
         regressor_timestamps (str, optional): Path to a CSV/TXT file of ISO timestamps, or a mesoscopy H5, for regressor generation. Defaults to None.
+        lever_durations (str, optional): Path to a lever push durations CSV. Defaults to the sibling file found by `find_lever_durations`.
     Returns:
         str: Returns directory under which files were saved
     """
-    trials_df = get_trials(path, to_csv=True, output_dir=output_dir)
+    trials_df = get_trials(path, to_csv=True, output_dir=output_dir, lever_durations=lever_durations)
     meta = get_metadata(path)
 
     if not no_report:
-        generate_report(path, output_dir=output_dir)
+        generate_report(path, output_dir=output_dir, lever_durations=lever_durations)
 
     if with_regressors:
         if not regressor_timestamps:
@@ -244,13 +258,17 @@ def get_metadata(path: str) -> dict:
     }
 
 
-def get_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd.DataFrame:
+def get_trials(
+    path: str, to_csv: bool = False, output_dir: str = ".", lever_durations: str | None = None
+) -> pd.DataFrame:
     """Parse a Visiomode JSON file and return a trials dataframe. Optionally save to CSV.
 
     Args:
         path (str): Path to Visiomode JSON file.
         to_csv (bool, optional): Save trials dataframe as a CSV. If True, indicate which directory to save in via `output_dir`. Defaults to False.
         output_dir (str, optional): Output directory for trials CSV file. Only used if `to_csv` is True. Defaults to current directory.
+        lever_durations (str, optional): Path to a lever push durations CSV. Defaults to the sibling file found by
+            `find_lever_durations`; without one, the dataframe has no `lever_duration` column.
 
     Returns:
         pd.DataFrame: Session trials dataframe, where each row is a trial.
@@ -280,11 +298,86 @@ def get_trials(path: str, to_csv: bool = False, output_dir: str = ".") -> pd.Dat
     # built any other way is treated the same.
     df["outcome"] = df["outcome"].replace(LEGACY_OUTCOME_LABELS)
 
+    lever_durations = lever_durations or find_lever_durations(path)
+    if lever_durations:
+        df = _add_lever_durations(df, lever_durations)
+
     if to_csv:
         out_path = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date')).replace('-', '')}_behaviour-{metadata.get('protocol')}_trials.csv"
         df.to_csv(out_path)
 
     return df
+
+
+def find_lever_durations(path: str) -> str | None:
+    """Return the lever push durations CSV next to a session JSON, if there is one.
+
+    `sub-X_exp-Y_ses-Z_behaviour-P.json` pairs with `sub-X_exp-Y_ses-Z_lever-durations.csv`; a JSON without a
+    `_behaviour-` token pairs with `<stem>_lever-durations.csv`.
+    """
+    json_path = Path(path)
+    prefix = json_path.stem.split("_behaviour-")[0]
+    candidate = json_path.with_name(f"{prefix}{LEVER_DURATIONS_SUFFIX}")
+    return str(candidate) if candidate.is_file() else None
+
+
+def _is_lever_push(df: pd.DataFrame) -> pd.Series:
+    """Trials in which the lever was pushed: precued trials, hits and false alarms."""
+    return (df["outcome"] == "precued") | df["sdt_type"].isin([HIT, FALSE_ALARM])
+
+
+def _add_lever_durations(df: pd.DataFrame, lever_durations: str) -> pd.DataFrame:
+    """Add a `lever_duration` (ms) column, matching the Nth push in `lever_durations` to the Nth lever push trial.
+
+    Non-push trials are NaN. If the number of pushes doesn't match the number of lever push trials, the matching
+    can't be trusted, so a warning is raised and the whole column is left NaN.
+    """
+    durations = pd.read_csv(lever_durations).sort_values("push_id")["duration"].to_numpy(dtype=float)
+    is_push = _is_lever_push(df)
+
+    df = df.copy()
+    df[LEVER_DURATION] = np.nan
+    if len(durations) != is_push.sum():
+        warnings.warn(
+            f"{lever_durations} has {len(durations)} lever pushes but the session has {is_push.sum()} lever push "
+            f"trials (precued, hits and false alarms); leaving {LEVER_DURATION} empty.",
+            stacklevel=2,
+        )
+    else:
+        df.loc[is_push, LEVER_DURATION] = durations
+    return df
+
+
+def _lever_duration_subsets(df: pd.DataFrame, include_corrections: bool = True) -> dict[str, pd.Series]:
+    """Lever durations per trial subset, keyed by the suffix used in summary field names ("" for all pushes)."""
+    if not include_corrections:
+        df = df[df.correction == False]  # noqa: E712
+    durations = df[LEVER_DURATION]
+    return {
+        "": durations[_is_lever_push(df)].dropna(),
+        "cued": durations[df.sdt_type.isin([HIT, FALSE_ALARM])].dropna(),
+        "hits": durations[df.sdt_type == HIT].dropna(),
+        "false_alarms": durations[df.sdt_type == FALSE_ALARM].dropna(),
+        "precued": durations[df.outcome == "precued"].dropna(),
+    }
+
+
+def _lever_duration_summary(df: pd.DataFrame) -> dict[str, float]:
+    """Mean, median, SD and IQR of lever durations for every subset in `_lever_duration_subsets`, with and without
+    correction trials, as `lever_duration_<stat>[_<subset>][_wc]` fields. Empty subsets yield NaN."""
+    fields = {}
+    for wc_suffix, include_corrections in (("", False), ("_wc", True)):
+        for subset, durations in _lever_duration_subsets(df, include_corrections=include_corrections).items():
+            subset_suffix = f"_{subset}" if subset else ""
+            stats = {
+                "mean": durations.mean(),
+                "median": durations.median(),
+                "sd": durations.std(ddof=1),
+                "iqr": durations.quantile(0.75) - durations.quantile(0.25),
+            }
+            for stat in LEVER_DURATION_STATS:
+                fields[f"{LEVER_DURATION}_{stat}{subset_suffix}{wc_suffix}"] = float(stats[stat])
+    return fields
 
 
 def get_rts(path: str, sdt_type=None, include_corrections=True) -> npt.NDArray:
@@ -299,18 +392,20 @@ def get_rts(path: str, sdt_type=None, include_corrections=True) -> npt.NDArray:
     return np.array(trials[(trials.response.notnull()) & (trials.cue_onset.notnull())].response_time.values)
 
 
-def summary(path: str) -> dict:
+def summary(path: str, lever_durations: str | None = None) -> dict:
     """Summarise session from a JSON or trials.csv file
 
     Args:
         path (str): Path to (preprocessed) trials.csv or raw JSON
+        lever_durations (str, optional): Path to a lever push durations CSV, for a raw JSON only. Defaults to the
+            sibling file found by `find_lever_durations`.
 
     Returns:
-        dict: Summary dictionary
+        dict: Summary dictionary. Lever duration fields are only included if the trials have a `lever_duration` column.
     """
     if path.endswith(".json"):
         metadata = get_metadata(path)
-        df = get_trials(path)
+        df = get_trials(path, lever_durations=lever_durations)
     else:
         df = pd.read_csv(path)
         metadata = {
@@ -471,6 +566,7 @@ def summary(path: str) -> dict:
         "rt_iqr_wc": rt_iqr_wc,
         "rt_idr": rt_idr,
         "rt_idr_wc": rt_idr_wc,
+        **(_lever_duration_summary(df) if LEVER_DURATION in df.columns else {}),
     }
 
 
@@ -565,12 +661,12 @@ def _read_aligned_timestamps(path: str, session_start_time: datetime.datetime) -
         return np.asarray(dataset[()], dtype=np.float64)
 
 
-def generate_report(path: str, output_dir: str = ".") -> str:
+def generate_report(path: str, output_dir: str = ".", lever_durations: str | None = None) -> str:
     template = env.get_template(SESSION_REPORT_TEMPLATE)
 
     metadata = get_metadata(path)
-    trials = get_trials(path)
-    session_summary = summary(path=path)
+    trials = get_trials(path, lever_durations=lever_durations)
+    session_summary = summary(path=path, lever_durations=lever_durations)
 
     template_identifiers = {
         "subject_id": metadata.get("animal_id"),
@@ -675,6 +771,22 @@ def generate_report(path: str, output_dir: str = ".") -> str:
         "fig_response_timeseries": plots.plot_trial_timeseries(trials=trials, as_html=True),
         "fig_sdt_timeseries": plots.plot_trial_timeseries(trials=trials, use_sdt=True, as_html=True),
     }
+
+    if LEVER_DURATION in trials.columns:
+        for fig_key, include_corrections in (
+            ("fig_lever_duration_median", False),
+            ("fig_lever_duration_median_wc", True),
+        ):
+            subsets = _lever_duration_subsets(trials, include_corrections=include_corrections)
+            template_identifiers[fig_key] = plots.plot_lever_duration_medians_from_dict(
+                {
+                    "all": subsets[""],
+                    "hits": subsets["hits"],
+                    **({} if is_targetonly(metadata.get("protocol")) else {"false_alarms": subsets["false_alarms"]}),
+                    "precued": subsets["precued"],
+                },
+                as_html=True,
+            )
 
     out_path = Path(
         f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date')).replace('-', '')}_behaviour-{metadata.get('protocol')}_report-session.html"
