@@ -169,6 +169,32 @@ def plot_rt_medians_from_dict(rt_dict: dict, stimulus_duration: int = 4, as_html
 def plot_rt_distribution(rts, as_html=False) -> str | go.Figure: ...
 
 
+def plot_lever_duration_medians_from_dict(duration_dict: dict, as_html=True) -> str | go.Figure:
+    """Median lever push duration (ms) per trial subset, with error bars spanning the IQR."""
+    stats = [_rt_stats(durations) for durations in duration_dict.values()]
+    fig = go.Figure(
+        go.Scatter(
+            y=[median for median, _, _ in stats],
+            x=[key for key in duration_dict.keys()],
+            error_y=dict(
+                type="data",
+                symmetric=False,
+                array=[q75 - median for median, _, q75 in stats],
+                arrayminus=[median - q25 for median, q25, _ in stats],
+            ),
+            mode="markers",
+        ),
+        layout=go.Layout(
+            margin={"l": 20, "r": 20, "t": 20, "b": 20},
+            yaxis_title="Duration (ms)",
+        ),
+    )
+
+    if as_html:
+        return fig.to_html(full_html=False)
+    return fig
+
+
 def plot_single_yvalue(value, ymin=0.0, ymax=1.0, as_html=False):
     fig = go.Figure(
         go.Scatter(
