@@ -246,6 +246,53 @@ def test_generate_regressors_rejects_unsupported_timestamps_file_extension(gonog
         session.generate_regressors(trials_df, metadata, str(bad_path), output_dir=str(tmp_path))
 
 
+def test_generate_regressors_uses_session_stimuli_as_go_and_nogo(tmp_path):
+    # A Go stimulus other than the generator's default ("movinggrating") still gets a stim_go regressor.
+    trials_df = pd.DataFrame(
+        [
+            dict(
+                start_time=0.0,
+                stop_time=5.0,
+                cue_onset=1.0,
+                stim_id="variablecontrastmovinggrating",
+                outcome="correct",
+                response="leverpush",
+                sdt_type="hit",
+                response_time=0.5,
+            ),
+            dict(
+                start_time=5.0,
+                stop_time=10.0,
+                cue_onset=6.0,
+                stim_id="checkerboard",
+                outcome="incorrect",
+                response="leverpush",
+                sdt_type="false_alarm",
+                response_time=0.3,
+            ),
+        ]
+    )
+    metadata = {
+        "protocol": "gonogo",
+        "animal_id": "MM228",
+        "experiment": "exp",
+        "session_date": "20220516",
+        "session_start_time": "2022-05-16T00:00:00",
+        "stimuli": {"target_id": "variablecontrastmovinggrating", "distractor_id": "checkerboard"},
+    }
+    timestamps_path = tmp_path / "timestamps.txt"
+    # During the Go stimulus of trial 0, and the NoGo stimulus of trial 1.
+    timestamps_path.write_text("2022-05-16T00:00:01.500000\n2022-05-16T00:00:06.200000\n")
+
+    out_path = session.generate_regressors(trials_df, metadata, str(timestamps_path), output_dir=str(tmp_path))
+
+    with np.load(out_path) as npz:
+        labels = list(npz["labels"])
+        regressors = npz["regressors"]
+    np.testing.assert_array_equal(regressors[:, labels.index("stim_go")], [1, 0])
+    np.testing.assert_array_equal(regressors[:, labels.index("stim_nogo")], [0, 1])
+
+
 def test_generate_regressors_rejects_unsupported_protocol(tmp_path):
     trials_df = pd.DataFrame(
         [dict(start_time=0.0, stop_time=1.0, cue_onset=0.5, stim_id="x", outcome="correct", response=None)]
