@@ -620,7 +620,8 @@ def generate_regressors(
     Args:
         trials_df (pd.DataFrame): A DataFrame containing trial data with columns for trial type,
             start time, and stop time.
-        metadata (dict): A dictionary containing session metadata.
+        metadata (dict): A dictionary containing session metadata. For Go/NoGo sessions, the target and distractor
+            in its `stimuli` are the Go and NoGo stimuli.
         regressor_timestamps_path (str): Path to a CSV or TXT file of ISO timestamps, or a mesoscopy H5 file with a
             `/timestamps_aligned` dataset. Typically corresponds to the frame times of an imaging session or other
             continuous recording.
@@ -661,7 +662,19 @@ def generate_regressors(
     outpath = f"{output_dir}{os.sep}sub-{metadata.get('animal_id')}_exp-{metadata.get('experiment')}_ses-{str(metadata.get('session_date')).replace('-', '')}_behaviour-{metadata.get('protocol')}_regressors.npz"
 
     if metadata.get("protocol") == "gonogo":
-        regressors, labels, trial_idx = rgr.generate_gonogo_regressors(trials_df, timestamps, trial_epoch_only=True)
+        # The Go and NoGo stimuli are the session's target and distractor; fall back to the generator's defaults for
+        # sessions whose spec doesn't name them.
+        stimulus_ids = {
+            arg: stim_id
+            for arg, stim_id in (
+                ("go_stim_id", metadata.get("stimuli", {}).get("target_id")),
+                ("nogo_stim_id", metadata.get("stimuli", {}).get("distractor_id")),
+            )
+            if stim_id
+        }
+        regressors, labels, trial_idx = rgr.generate_gonogo_regressors(
+            trials_df, timestamps, trial_epoch_only=True, **stimulus_ids
+        )
         np.savez(
             outpath,
             regressors=regressors,
@@ -869,6 +882,35 @@ def _normalise_no_response(trial: Any) -> Any:
     return trial
 
 
+def _reconstruct_gonogo_stimulus(trial: Any, metadata: dict) -> dict:
+    """Return the `stim_*` fields of the stimulus a Go/NoGo trial showed, for sessions whose trials don't record it.
+
+    The shown stimulus is inferred from the outcome and whether there was a response: the target for hits and misses
+    (`no_response`, or `incorrect` without a response), the distractor for false alarms and correct rejections, and
+    none for precued trials. Its fields come from the session-level `stimuli` metadata, plus, for sessions that record
+    per-trial parameters for both stimuli (`{"target": {...}, "distractor": {...}}`, e.g. the contrast of a variable
+    contrast grating), those of the shown stimulus.
+    """
+    responded = bool(trial.get("response"))
+    outcome = trial.get("outcome")
+    if (responded and outcome == "correct") or (not responded and outcome in ("incorrect", "no_response")):
+        shown = "target"
+    elif (responded and outcome == "incorrect") or (not responded and outcome == "correct"):
+        shown = "distractor"
+    else:
+        return {}
+
+    per_trial_params = trial.get("stimulus").get(shown) or {} if isinstance(trial.get("stimulus"), dict) else {}
+    return {
+        **{
+            f"stim_{key.replace(f'{shown}_', '')}": value
+            for key, value in metadata.get("stimuli", {}).items()
+            if key.startswith(f"{shown}_")
+        },
+        **{f"stim_{key}": value for key, value in per_trial_params.items()},
+    }
+
+
 def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
     session_start_time = datetime.datetime.fromisoformat(metadata.get("session_start_time", ""))
 
@@ -902,7 +944,15 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
         dist_y = trial.get("response").get("dist_y", 0) if trial.get("response") else None
 
         stimulus: dict = {}
-        if trial.get("stimulus"):
+        if (
+            metadata.get("protocol") == "gonogo"
+            and isinstance(trial.get("stimulus"), dict)
+            and "target" in trial.get("stimulus")
+        ):
+            # Some Visiomode versions before 0.5 record per-trial parameters for both Go/NoGo stimuli rather than
+            # which one was shown, so it's reconstructed as for sessions without a per-trial stimulus.
+            stimulus = _reconstruct_gonogo_stimulus(trial, metadata)
+        elif trial.get("stimulus"):
             if trial.get("stimulus") == "None":
                 stimulus = {}
             elif trial.get("stimulus").get("common_name"):
@@ -917,26 +967,7 @@ def _flatten_trials(session: dict, metadata: dict) -> Iterator[dict]:
                 stimulus = {**target_stim, **distractor_stim}
         else:  # handle older versions of visiomode
             if metadata.get("protocol") == "gonogo":
-                if (trial.get("response") and trial.get("outcome") == "correct") or (
-                    not trial.get("response") and trial.get("outcome") == "incorrect"
-                ):
-                    stimulus = {
-                        **{
-                            f"stim_{key.replace('target_', '')}": value
-                            for key, value in metadata.get("stimuli", {}).items()
-                            if key.startswith("target_")
-                        },
-                    }
-                elif (trial.get("response") and trial.get("outcome") == "incorrect") or (
-                    not trial.get("response") and trial.get("outcome") == "correct"
-                ):
-                    stimulus = {
-                        **{
-                            f"stim_{key.replace('distractor_', '')}": value
-                            for key, value in metadata.get("stimuli", {}).items()
-                            if key.startswith("distractor_")
-                        },
-                    }
+                stimulus = _reconstruct_gonogo_stimulus(trial, metadata)
             elif is_targetonly(metadata.get("protocol")):
                 if (trial.get("response") and (trial.get("outcome") == "correct")) or (
                     trial.get("outcome") == "no_response"
