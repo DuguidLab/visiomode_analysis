@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Stimulus and cue onset of Go/NoGo trials in pre-0.5 Visiomode sessions.** In
+  sessions without a per-trial stimulus, misses (outcome `no_response`) were not
+  matched to the Go stimulus, so they had an empty `cue_onset` and `stim_*` fields.
+  In sessions whose trials record `{"target": {}, "distractor": {}}`, no trial had
+  a `cue_onset` or `stim_*` fields. In sessions that record per-trial target
+  parameters (e.g. the contrast of `variablecontrastmovinggrating`), precued
+  trials got a `cue_onset` after the trial had ended, NoGo trials got the previous
+  grating's contrast, and there was no `stim_id`. For all three, the shown stimulus
+  is now worked out from the outcome and response: precued trials have no
+  stimulus, and the per-trial contrast appears as `stim_trial_contrast` on Go trials
+  only (it was `target_trial_contrast` on every trial). Regressors now give misses
+  their Go stimulus and hold regressors, and sessions of the last two kinds no longer
+  fail with `KeyError: 'stim_id'`. The overall reaction time plot in session reports,
+  which only counts trials with a cue onset, was empty for the second kind and
+  included precued pushes for the third. Session and subject summaries were not
+  affected. Re-run `session` (and `regressors`) on these sessions to update their
+  trials CSVs, reports and regressors.
+- **Go/NoGo regressors for sessions with non-default stimuli.** `regressors` assumed
+  the Go stimulus was `movinggrating` and the NoGo stimulus `isoluminantgray`. It now
+  uses the session's target and distractor, so sessions with other stimuli (e.g.
+  `variablecontrastmovinggrating`) get stimulus regressors.
+
 ## [0.4.1] - 2026-10-02
 
 ### Fixed
