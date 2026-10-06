@@ -1,8 +1,9 @@
 """Tests for `session._flatten_trials`'s handling of different Visiomode JSON formats: sessions
 recorded before an explicit `stimulus`/`sdt_type` field existed on each trial, where the presented
 stimulus and signal-detection classification instead have to be reconstructed from the trial's
-`outcome`/`response` and the session-level `stimuli` metadata, and newer (0.5+) sessions that record
-a trial without a response as a response named "none".
+`outcome`/`response` and the session-level `stimuli` metadata (as they also are for Go/NoGo sessions
+whose per-trial stimulus holds both stimuli's parameters but not which was shown), and newer (0.5+)
+sessions that record a trial without a response as a response named "none".
 """
 
 import numpy as np
@@ -68,6 +69,94 @@ def test_legacy_gonogo_miss_reconstructs_target_stimulus_and_classifies_as_miss(
     assert trial["stim_id"] == "movinggrating"
 
 
+def test_legacy_gonogo_no_response_miss_reconstructs_target_stimulus_and_cue_onset(flatten_trial):
+    # Recorded Go/NoGo sessions label misses "no_response", not "incorrect".
+    trial = flatten_trial({**BASE_TRIAL, "response": None, "response_time": -1, "outcome": "no_response"})
+
+    assert trial["sdt_type"] == "miss"
+    assert trial["stim_id"] == "movinggrating"
+    assert trial["cue_onset"] == pytest.approx(1.0 + BASE_TRIAL["iti"])
+
+
+def test_legacy_gonogo_precued_has_no_stimulus(flatten_trial):
+    trial = flatten_trial(
+        {**BASE_TRIAL, "response": {"timestamp": "2022-01-01T00:00:03"}, "outcome": "precued"},
+    )
+
+    assert "stim_id" not in trial
+    assert np.isnan(trial["cue_onset"])
+
+
+# -- Go/NoGo sessions from Visiomode versions before 0.5 that record per-trial parameters for both stimuli, but not
+# which was shown, as `{"target": {...}, "distractor": {...}}`. --
+
+PUSH = {"timestamp": "2022-01-01T00:00:07", "pos_x": 400.0, "pos_y": 240.0}
+
+
+@pytest.mark.parametrize(
+    "outcome, response, sdt_type, stim_id",
+    [
+        ("correct", PUSH, "hit", "movinggrating"),
+        ("no_response", None, "miss", "movinggrating"),
+        ("incorrect", PUSH, "false_alarm", "isoluminantgray"),
+        ("correct", None, "correct_rejection", "isoluminantgray"),
+    ],
+)
+def test_gonogo_empty_stimulus_pair_reconstructs_shown_stimulus(flatten_trial, outcome, response, sdt_type, stim_id):
+    trial = flatten_trial(
+        {**BASE_TRIAL, "outcome": outcome, "response": response, "stimulus": {"target": {}, "distractor": {}}}
+    )
+
+    assert trial["sdt_type"] == sdt_type
+    assert trial["stim_id"] == stim_id
+    assert trial["cue_onset"] == pytest.approx(1.0 + BASE_TRIAL["iti"])
+
+
+def test_gonogo_stimulus_pair_adds_per_trial_params_to_target_trials(flatten_trial):
+    trial = flatten_trial(
+        {
+            **BASE_TRIAL,
+            "outcome": "correct",
+            "response": PUSH,
+            "stimulus": {"target": {"trial_contrast": 0.25}, "distractor": {}},
+        }
+    )
+
+    assert trial["stim_id"] == "movinggrating"
+    assert trial["stim_trial_contrast"] == 0.25
+    assert not any(key.startswith(("target_", "distractor_")) for key in trial)
+
+
+def test_gonogo_stimulus_pair_leaves_target_params_off_distractor_trials(flatten_trial):
+    # Each trial records the target's parameters, whichever stimulus was shown.
+    trial = flatten_trial(
+        {
+            **BASE_TRIAL,
+            "outcome": "correct",
+            "response": None,
+            "stimulus": {"target": {"trial_contrast": 0.25}, "distractor": {}},
+        }
+    )
+
+    assert trial["stim_id"] == "isoluminantgray"
+    assert "stim_trial_contrast" not in trial
+
+
+def test_gonogo_stimulus_pair_precued_has_no_stimulus(flatten_trial):
+    trial = flatten_trial(
+        {
+            **BASE_TRIAL,
+            "outcome": "precued",
+            "response": {"timestamp": "2022-01-01T00:00:03"},
+            "stimulus": {"target": {"trial_contrast": 0}, "distractor": {}},
+        }
+    )
+
+    assert not any(key.startswith(("stim_", "target_", "distractor_")) for key in trial)
+    # The push ended the trial before the stimulus was due.
+    assert np.isnan(trial["cue_onset"])
+
+
 def test_stimulus_literal_none_string_is_treated_as_no_stimulus(flatten_trial):
     trial = flatten_trial({**BASE_TRIAL, "response": None, "stimulus": "None"})
 
@@ -98,7 +187,8 @@ def test_stimulus_with_target_and_distractor_keys_uses_2afc_format(flatten_trial
             **BASE_TRIAL,
             "response": None,
             "stimulus": {"target": {"id": "left_shape"}, "distractor": {"id": "right_shape"}},
-        }
+        },
+        metadata_overrides={"protocol": "afc2"},
     )
 
     assert trial["target_id"] == "left_shape"
