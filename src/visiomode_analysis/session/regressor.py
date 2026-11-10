@@ -87,7 +87,7 @@ def generate_gonogo_regressors(
     regr_stim_go = (
         (stim_id[trial_idx] == go_stim_id)
         & (ts >= cue_onset[trial_idx])
-        & (ts <= stop_time[trial_idx] + leverpush_rt - lever_push_duration)
+        & (ts <= cue_onset[trial_idx] + leverpush_rt - lever_push_duration)
     ).astype(int)
     regr_stim_nogo = (
         (stim_id[trial_idx] == nogo_stim_id)
