@@ -7,12 +7,13 @@ from visiomode_analysis.session import regressor as rgr
 
 @pytest.fixture
 def gonogo_trials() -> pd.DataFrame:
-    """Three hand-crafted Go/NoGo trials covering a hit, a false alarm, and a correct rejection.
+    """Four hand-crafted Go/NoGo trials covering a hit, a false alarm, a correct rejection, and a miss.
 
     Trial 0: hit on the "go" stimulus, lever pushed at RT=0.5s (sets the median RT used for
-        the "hold" and "nogo" windows below).
+        the "nogo", "hold" and missed "go" windows below).
     Trial 1: false alarm on the "nogo" stimulus, lever pushed at RT=0.3s.
     Trial 2: correct rejection on the "nogo" stimulus, no lever push.
+    Trial 3: miss on the "go" stimulus, no lever push.
     """
     return pd.DataFrame(
         [
@@ -46,6 +47,16 @@ def gonogo_trials() -> pd.DataFrame:
                 sdt_type="correct_rejection",
                 response_time=np.nan,
             ),
+            dict(
+                start_time=15.0,
+                stop_time=20.0,
+                cue_onset=17.0,
+                stim_id="movinggrating",
+                outcome="no_response",
+                response=None,
+                sdt_type="miss",
+                response_time=np.nan,
+            ),
         ]
     )
 
@@ -54,13 +65,15 @@ def test_generate_gonogo_regressors_flags_expected_events(gonogo_trials):
     # leverpush_rt = median hit response_time = 0.5s, so windows below are relative to that.
     timestamps = [
         0.5,  # trial 0, before cue onset -> nothing
-        1.5,  # trial 0, during the go stimulus -> stim_go
+        1.5,  # trial 0, past the median RT but before the push, as it's a hit -> stim_go
         4.95,  # trial 0, in the final 0.08s before stop -> cued lever push
         5.2,  # trial 1, ITI following a correct trial -> reward
         6.3,  # trial 1, within the nogo/leverpush-RT window -> stim_nogo (and still within reward window)
         9.95,  # trial 1, in the final 0.08s before stop -> cued lever push
         11.45,  # trial 2, in the expected-push hold window, but no push -> resp_hold
-        20.0,  # outside every trial window -> excluded entirely
+        17.2,  # trial 3, within the go/leverpush-RT window (17.0-17.42s), as it's a miss -> stim_go
+        17.45,  # trial 3, after the missed go window, in the hold window -> resp_hold only
+        25.0,  # outside every trial window -> excluded entirely
     ]
 
     regressors, labels, trial_entries = rgr.generate_gonogo_regressors(
@@ -77,7 +90,7 @@ def test_generate_gonogo_regressors_flags_expected_events(gonogo_trials):
     }
 
     # The last timestamp falls after every trial's stop_time, so it's dropped from the entries.
-    np.testing.assert_array_equal(trial_entries, [True, True, True, True, True, True, True, False])
+    np.testing.assert_array_equal(trial_entries, [True, True, True, True, True, True, True, True, True, False])
 
     expected = np.array(
         [
@@ -88,13 +101,15 @@ def test_generate_gonogo_regressors_flags_expected_events(gonogo_trials):
             [0, 1, 0, 0, 0, 1],
             [0, 0, 1, 0, 0, 0],
             [0, 0, 0, 0, 1, 0],
+            [1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 1, 0],
         ]
     )
     np.testing.assert_array_equal(regressors, expected)
 
 
 def test_generate_gonogo_regressors_pads_zero_rows_outside_trial_epochs(gonogo_trials):
-    timestamps = [0.5, 20.0]
+    timestamps = [0.5, 25.0]
 
     regressors, _, trial_entries = rgr.generate_gonogo_regressors(gonogo_trials, timestamps, trial_epoch_only=False)
 

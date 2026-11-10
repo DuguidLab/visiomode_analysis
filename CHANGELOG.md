@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Go stimulus regressor on misses.** In Go/NoGo regressors, `stim_go` ran from cue
+  onset until 80 ms before the end of the trial. On misses, where there is no lever
+  push, that covered the whole response window. On misses it now uses the same
+  window as `stim_nogo`, ending 80 ms (the lever push duration) before the session's
+  median hit reaction time after cue onset. Hits are unchanged: their `stim_go` still
+  ends 80 ms before the push. Re-run `regressors` on Go/NoGo sessions to update them.
+
 ## [0.4.2] - 2026-10-06
 
 ### Fixed

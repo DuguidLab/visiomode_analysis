@@ -84,10 +84,15 @@ def generate_gonogo_regressors(
     trial_idx = ts_indexes[entry_idx]
 
     # Stimulus regressors
+    # On hits, the Go stimulus runs until the lever push. On misses there is no push, so it ends where the NoGo
+    # stimulus does, at the median hit RT.
+    go_stim_end = np.where(
+        leverpush[trial_idx],
+        stop_time[trial_idx] - lever_push_duration,
+        cue_onset[trial_idx] + leverpush_rt - lever_push_duration,
+    )
     regr_stim_go = (
-        (stim_id[trial_idx] == go_stim_id)
-        & (ts >= cue_onset[trial_idx])
-        & (ts <= cue_onset[trial_idx] + leverpush_rt - lever_push_duration)
+        (stim_id[trial_idx] == go_stim_id) & (ts >= cue_onset[trial_idx]) & (ts <= go_stim_end)
     ).astype(int)
     regr_stim_nogo = (
         (stim_id[trial_idx] == nogo_stim_id)
